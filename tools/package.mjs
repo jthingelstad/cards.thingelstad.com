@@ -3,8 +3,8 @@
 //   node tools/package.mjs     bundle, stage and zip into .build/; no AWS
 //
 // The zip holds index.mjs (src/handler.mjs bundled by esbuild), package.json,
-// resvg.wasm and fonts/. .build/assets/ holds the same resvg.wasm and fonts/
-// for local renders (tools/render.mjs, the tests). The zip's key,
+// resvg.wasm, fonts/ and emoji/. .build/assets/ holds the same resvg.wasm,
+// fonts/ and emoji/ for local renders (tools/render.mjs, the tests). The zip's key,
 // code/<sha256>.zip, hashes the entries' names and contents rather than the
 // zip's bytes, so the same source gives the same key on any machine and a
 // deploy of an unchanged package has nothing to do (the approach Linking
@@ -23,13 +23,16 @@ export const ASSETS = path.join(OUT, 'assets');
 
 const sha256 = (data) => createHash('sha256').update(data).digest('hex');
 
-/** resvg's WebAssembly and the fonts, as zip entries. */
+/** resvg's WebAssembly, the fonts and the emoji, as zip entries. */
 export async function assets() {
   const fontDir = (file) =>
     path.join(ROOT, 'node_modules/@fontsource', file.startsWith('inter-tight') ? 'inter-tight' : 'inter', 'files', file);
+  const emojiDir = path.join(ROOT, 'node_modules/@twemoji/svg');
+  const emoji = (await fs.readdir(emojiDir)).filter((file) => file.endsWith('.svg'));
   return [
     { name: 'resvg.wasm', data: await fs.readFile(path.join(ROOT, 'node_modules/@resvg/resvg-wasm/index_bg.wasm')) },
     ...(await Promise.all(FONTS.map(async ({ file }) => ({ name: `fonts/${file}`, data: await fs.readFile(fontDir(file)) })))),
+    ...(await Promise.all(emoji.map(async (file) => ({ name: `emoji/${file}`, data: await fs.readFile(path.join(emojiDir, file)) })))),
   ];
 }
 

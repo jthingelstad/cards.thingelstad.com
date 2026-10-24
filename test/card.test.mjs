@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cardFor, excerpt, fitSize, formatDate, HEIGHT, WIDTH } from '../src/card.mjs';
 import { SITES } from '../src/post.mjs';
-import { render } from '../src/render.mjs';
+import { emojiAsset, emojiFiles, render } from '../src/render.mjs';
 import { stageAssets } from '../tools/package.mjs';
 
 test('dates are Jamie\'s calendar day', () => {
@@ -33,6 +33,7 @@ test('every kind of card draws a 1200 x 630 PNG', async () => {
     { title: '', text: 'Worked with Claude today and created Linking Things! '.repeat(4) },
     { title: '', text: 'Ok.' },
     { title: 'Ünïcödé — “quotes” and Łódź', text: '' },
+    { title: `Red leaves. ${String.fromCodePoint(0x1f342)}`, text: '' },
   ];
   for (const base of posts) {
     const post = { published: '2026-10-15T12:00:00Z', categories: ['Travel', 'Food'], photo: null, ...base };
@@ -41,4 +42,17 @@ test('every kind of card draws a 1200 x 630 PNG', async () => {
     assert.equal(png.readUInt32BE(16), WIDTH);
     assert.equal(png.readUInt32BE(20), HEIGHT);
   }
+});
+
+const emoji = (...points) => String.fromCodePoint(...points);
+
+test('an emoji finds its Twemoji file', async () => {
+  assert.deepEqual(emojiFiles(emoji(0x1f342)), ['1f342.svg']);
+  assert.deepEqual(emojiFiles(emoji(0x2764, 0xfe0f)), ['2764.svg']);
+  assert.deepEqual(emojiFiles(emoji(0x2764, 0xfe0f, 0x200d, 0x1f525)), ['2764-fe0f-200d-1f525.svg', '2764-200d-1f525.svg']);
+  const load = emojiAsset(await stageAssets());
+  assert.match(await load('emoji', emoji(0x1f342)), /^data:image\/svg\+xml;base64,/);
+  assert.match(await load('emoji', emoji(0x2764, 0xfe0f, 0x200d, 0x1f525)), /^data:image\/svg\+xml;base64,/);
+  assert.notEqual(await load('emoji', emoji(0x1f342)), await load('emoji', emoji(0x10ffff)));
+  assert.deepEqual(await load('ja-JP', 'こんにちは'), []);
 });

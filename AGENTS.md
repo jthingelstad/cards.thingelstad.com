@@ -29,7 +29,10 @@ last-edit date), so an edited post gets a new card.
 - `src/card.mjs` is the layout, as the element tree Satori draws.
 - `src/render.mjs` draws it: Satori to SVG, resvg (WebAssembly) to PNG, with
   static Inter and Inter Tight WOFF from Fontsource 5.3.0 (Satori reads no WOFF2
-  or variable fonts).
+  or variable fonts). Emoji are Twemoji SVGs (`@twemoji/svg` 15.0.0, graphics
+  CC-BY 4.0) drawn as images in the line; one newer than that set draws as
+  nothing, never as a missing-glyph box. Other scripts the fonts lack (CJK,
+  Arabic) still draw as boxes: no font is loaded for them.
 - `src/handler.mjs` is the Lambda: one function URL, IAM auth, invoked only by
   its CloudFront distribution (origin access control). A card is drawn once and
   CloudFront keeps it a year, keyed on the path and `v`; a missing post is a
