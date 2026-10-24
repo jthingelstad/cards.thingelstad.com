@@ -17,5 +17,5 @@
   "functionName": "cards",
   "distributionId": "E2MDXGB2OR2ACC",
   "cloudfrontDomain": "d1jbzifks320ts.cloudfront.net",
-  "certificateArn": null
+  "certificateArn": "arn:aws:acm:us-east-1:999153317627:certificate/7fdbfe57-0c2c-4526-9a54-6b9e8511a349"
 }
