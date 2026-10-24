@@ -12,5 +12,10 @@
     "Repository": "jthingelstad/cards.thingelstad.com",
     "ManagedBy": "cloudformation",
     "Environment": "production"
-  }
+  },
+  "codeBucket": "cards-code-999153317627",
+  "functionName": "cards",
+  "distributionId": "E2MDXGB2OR2ACC",
+  "cloudfrontDomain": "d1jbzifks320ts.cloudfront.net",
+  "certificateArn": null
 }
