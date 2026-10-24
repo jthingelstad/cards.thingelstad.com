@@ -11,12 +11,13 @@ each post on Jamie's sites, drawn from the post itself. Decided with Jamie on
 no photo of Jamie, the blog's type in black and white, and photo posts get the
 card too (the photo takes the right half).
 
-    https://cards.thingelstad.com/www/2026/10/15/the-nnxyz-rooms.png?v=<last edit>
+    https://cards.thingelstad.com/www/2026/10/15/the-nnxyz-rooms.png?v=<hash>
 
 names https://www.thingelstad.com/2026/10/15/the-nnxyz-rooms.html. Only the
 blog (`www`) has cards so far; `SITES` in `src/post.mjs` is where another site
-would join. The theme (thing-hugo `partials/meta.html`) sets `og:image` to the
-card with `?v=` from the post's last edit, so an edited post gets a new card.
+would join. The theme (thing-hugo `partials/meta.html`) is to set `og:image`
+to the card with `?v=` a hash of the post's title, date, categories and text
+(micro.blog gives Hugo no last-edit date), so an edited post gets a new card; that change waits on Jamie's go, since thing-hugo `main` is the live blog.
 
 ## How it works
 

@@ -6,8 +6,8 @@
 //   GET /health                            the package this function runs
 //
 // A card is drawn once and kept: CloudFront holds it for a year, keyed on
-// the path and ?v=, which the theme sets from the post's last edit so an
-// edited post gets a new card. A post that doesn't exist is a 404, kept
+// the path and ?v=, which the theme sets from a hash of the post's words so
+// an edited post gets a new card. A post that doesn't exist is a 404, kept
 // for five minutes. One log line a request, never a post's words.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
