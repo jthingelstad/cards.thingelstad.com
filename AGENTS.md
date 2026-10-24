@@ -15,9 +15,10 @@ card too (the photo takes the right half).
 
 names https://www.thingelstad.com/2026/10/15/the-nnxyz-rooms.html. Only the
 blog (`www`) has cards so far; `SITES` in `src/post.mjs` is where another site
-would join. The theme (thing-hugo `partials/meta.html`) is to set `og:image`
-to the card with `?v=` a hash of the post's title, date, categories and text
-(micro.blog gives Hugo no last-edit date), so an edited post gets a new card; that change waits on Jamie's go, since thing-hugo `main` is the live blog.
+would join. The theme (thing-hugo `partials/meta.html`, 2.0.19, live
+2026-10-24) sets `og:image` on every post to its card, with `?v=` a hash of
+the post's title, date, categories and text (micro.blog gives Hugo no
+last-edit date), so an edited post gets a new card.
 
 ## How it works
 
