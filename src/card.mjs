@@ -52,9 +52,22 @@ export function excerpt(text, limit) {
   return `${cut.slice(0, space > limit * 0.6 ? space : limit).replace(/[\s,;:–—-]+$/, '')}…`;
 }
 
+// The words' column: the left half beside a photo, else the whole card, less
+// 64px either side.
+const PAD = 64;
+const column = (photo) => (photo ? WIDTH / 2 : WIDTH);
+
 // Type sizes by length, with lines kept so nothing runs into the band.
 const titleSize = (n, photo) =>
   photo ? (n <= 22 ? 72 : n <= 44 ? 60 : 50) : n <= 26 ? 100 : n <= 50 ? 80 : 64;
+
+// Smaller still when the longest word would not fit on a line: Satori breaks
+// no word, so "Tournament" at 72px beside a photo was cut to "Tourname…".
+// em is a generous average advance for the face, so a word fits with room.
+export function fitSize(size, text, width, em) {
+  const longest = Math.max(...text.split(/\s+/).map((word) => word.length));
+  return Math.max(28, Math.min(size, Math.floor(width / (em * longest))));
+}
 
 function noteStyle(n, photo) {
   if (n <= 40) return { fontSize: photo ? 56 : 76, fontFamily: 'Inter Tight', fontWeight: 700, lines: 4 };
@@ -67,10 +80,11 @@ function noteStyle(n, photo) {
 export function cardFor(post, { site, photo }) {
   const meta = [formatDate(post.published), ...post.categories.slice(0, 3)].filter(Boolean).join(' · ');
   const hasPhoto = Boolean(photo);
+  const width = column(hasPhoto) - 2 * PAD;
   const words = [];
 
   if (post.title) {
-    const size = titleSize(post.title.length, hasPhoto);
+    const size = fitSize(titleSize(post.title.length, hasPhoto), post.title, width, 0.64);
     words.push(
       h(
         'div',
@@ -83,7 +97,7 @@ export function cardFor(post, { site, photo }) {
           letterSpacing: '-0.025em',
           color: INK,
           textWrap: 'balance',
-          lineClamp: hasPhoto ? 4 : 3,
+          lineClamp: hasPhoto ? 5 : 3,
         },
         post.title,
       ),
@@ -107,6 +121,7 @@ export function cardFor(post, { site, photo }) {
   } else if (post.text) {
     const text = excerpt(post.text, hasPhoto ? 200 : 260);
     const { lines, ...style } = noteStyle(text.length, hasPhoto);
+    style.fontSize = fitSize(style.fontSize, text, width, style.fontFamily === 'Inter' ? 0.62 : 0.64);
     words.push(
       h(
         'div',
@@ -124,25 +139,26 @@ export function cardFor(post, { site, photo }) {
     );
   }
 
-  const column = h(
+  const side = h(
     'div',
     {
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'space-between',
       flexShrink: 0,
-      width: hasPhoto ? 472 : WIDTH,
-      padding: '52px 64px 40px 64px',
+      boxSizing: 'border-box',
+      width: column(hasPhoto),
+      padding: `52px ${PAD}px 40px ${PAD}px`,
     },
     h(
       'div',
       { display: 'block', fontSize: 22, fontWeight: 600, letterSpacing: '0.04em', color: MUTED, lineClamp: 2 },
       meta || ' ',
     ),
-    h('div', { display: 'flex', flexDirection: 'column', width: (hasPhoto ? 472 : WIDTH) - 128 }, ...words),
+    h('div', { display: 'flex', flexDirection: 'column', width }, ...words),
   );
 
-  const main = [column];
+  const main = [side];
   if (hasPhoto)
     main.push(
       h(
