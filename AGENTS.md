@@ -54,3 +54,8 @@ for a card under a new `v`, and each miss is a render.
 
 Alarms (draw failures, function errors) go to
 `weekly-thing-librarian-alarms`, the queue-only topic the other sites use.
+They see only requests that reach the function, so DNS, the certificate and
+CloudFront are watched from outside: Jamie's updown.io check (2026-10-24; not
+Tinylytics, which has no page views here to count). `/health` is the path to
+check, never `/`, which is a 404 by design. Keep the ACM validation CNAME
+(`_599951081a9a6beba0c85c6a673beb51.cards`) at Namecheap: renewal needs it.
