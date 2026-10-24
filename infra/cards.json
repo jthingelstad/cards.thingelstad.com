@@ -1,0 +1,539 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "cards.thingelstad.com social card maker, a Lambda function URL behind CloudFront",
+  "Parameters": {
+    "CodeKey": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|^code/[0-9a-f]{64}\\.zip$",
+      "Description": "The packaged card maker in the code bucket (tools/package.mjs). Empty creates only the bucket, role and logs."
+    },
+    "CodeVersion": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^[A-Za-z0-9._-]*$",
+      "Description": "The S3 version of CodeKey, so a deploy names immutable bytes"
+    },
+    "CertificateArn": {
+      "Type": "String",
+      "Default": "",
+      "AllowedPattern": "^$|^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[0-9a-f-]+$",
+      "Description": "The ISSUED cards.thingelstad.com certificate (cards-certificate stack). Empty serves only the CloudFront domain."
+    }
+  },
+  "Conditions": {
+    "HasCode": {
+      "Fn::And": [
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "CodeKey"
+                },
+                ""
+              ]
+            }
+          ]
+        },
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "CodeVersion"
+                },
+                ""
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "HasCertificate": {
+      "Fn::And": [
+        {
+          "Condition": "HasCode"
+        },
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "CertificateArn"
+                },
+                ""
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "CodeBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "${AWS::StackName}-code-${AWS::AccountId}"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "AbortIncompleteUploads",
+              "Status": "Enabled",
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 7
+              }
+            },
+            {
+              "Id": "ExpireOldVersions",
+              "Status": "Enabled",
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": 30
+              }
+            }
+          ]
+        }
+      }
+    },
+    "CodeBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "CodeBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "TLSOnly",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "CodeBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${CodeBucket.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Logs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${AWS::StackName}"
+        },
+        "RetentionInDays": 30
+      }
+    },
+    "ExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Description": "cards execution role: writes its own logs and nothing else",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "OwnLogs",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${Logs.Arn}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "Function": {
+      "Type": "AWS::Lambda::Function",
+      "Condition": "HasCode",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${AWS::StackName}"
+        },
+        "Description": "Draws a post's social card",
+        "Runtime": "nodejs24.x",
+        "Architectures": [
+          "arm64"
+        ],
+        "Handler": "index.handler",
+        "MemorySize": 1024,
+        "Timeout": 20,
+        "ReservedConcurrentExecutions": 10,
+        "Role": {
+          "Fn::GetAtt": [
+            "ExecutionRole",
+            "Arn"
+          ]
+        },
+        "Code": {
+          "S3Bucket": {
+            "Ref": "CodeBucket"
+          },
+          "S3Key": {
+            "Ref": "CodeKey"
+          },
+          "S3ObjectVersion": {
+            "Ref": "CodeVersion"
+          }
+        },
+        "Environment": {
+          "Variables": {
+            "CARDS_CODE": {
+              "Ref": "CodeKey"
+            }
+          }
+        },
+        "LoggingConfig": {
+          "LogGroup": {
+            "Ref": "Logs"
+          },
+          "LogFormat": "Text"
+        }
+      }
+    },
+    "FunctionUrl": {
+      "Type": "AWS::Lambda::Url",
+      "Condition": "HasCode",
+      "Properties": {
+        "TargetFunctionArn": {
+          "Fn::GetAtt": [
+            "Function",
+            "Arn"
+          ]
+        },
+        "AuthType": "AWS_IAM"
+      }
+    },
+    "OriginAccess": {
+      "Type": "AWS::CloudFront::OriginAccessControl",
+      "Condition": "HasCode",
+      "Properties": {
+        "OriginAccessControlConfig": {
+          "Name": {
+            "Fn::Sub": "${AWS::StackName}-function-url"
+          },
+          "Description": "CloudFront signs every request to the card maker",
+          "OriginAccessControlOriginType": "lambda",
+          "SigningBehavior": "always",
+          "SigningProtocol": "sigv4"
+        }
+      }
+    },
+    "CachePolicy": {
+      "Type": "AWS::CloudFront::CachePolicy",
+      "Condition": "HasCode",
+      "Properties": {
+        "CachePolicyConfig": {
+          "Name": {
+            "Fn::Sub": "${AWS::StackName}-cards"
+          },
+          "Comment": "Path and v; the card maker sets how long each answer keeps",
+          "MinTTL": 0,
+          "DefaultTTL": 86400,
+          "MaxTTL": 31536000,
+          "ParametersInCacheKeyAndForwardedToOrigin": {
+            "EnableAcceptEncodingGzip": false,
+            "EnableAcceptEncodingBrotli": false,
+            "HeadersConfig": {
+              "HeaderBehavior": "none"
+            },
+            "CookiesConfig": {
+              "CookieBehavior": "none"
+            },
+            "QueryStringsConfig": {
+              "QueryStringBehavior": "whitelist",
+              "QueryStrings": [
+                "v"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Distribution": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Condition": "HasCode",
+      "Properties": {
+        "DistributionConfig": {
+          "Enabled": true,
+          "Comment": "cards.thingelstad.com",
+          "HttpVersion": "http2and3",
+          "IPV6Enabled": true,
+          "PriceClass": "PriceClass_100",
+          "Aliases": {
+            "Fn::If": [
+              "HasCertificate",
+              [
+                "cards.thingelstad.com"
+              ],
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          "ViewerCertificate": {
+            "Fn::If": [
+              "HasCertificate",
+              {
+                "AcmCertificateArn": {
+                  "Ref": "CertificateArn"
+                },
+                "SslSupportMethod": "sni-only",
+                "MinimumProtocolVersion": "TLSv1.2_2021"
+              },
+              {
+                "CloudFrontDefaultCertificate": true
+              }
+            ]
+          },
+          "Origins": [
+            {
+              "Id": "cards",
+              "DomainName": {
+                "Fn::Select": [
+                  2,
+                  {
+                    "Fn::Split": [
+                      "/",
+                      {
+                        "Fn::GetAtt": [
+                          "FunctionUrl",
+                          "FunctionUrl"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "OriginAccessControlId": {
+                "Fn::GetAtt": [
+                  "OriginAccess",
+                  "Id"
+                ]
+              },
+              "CustomOriginConfig": {
+                "HTTPSPort": 443,
+                "OriginProtocolPolicy": "https-only",
+                "OriginSSLProtocols": [
+                  "TLSv1.2"
+                ],
+                "OriginReadTimeout": 30
+              }
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "TargetOriginId": "cards",
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "AllowedMethods": [
+              "GET",
+              "HEAD"
+            ],
+            "CachedMethods": [
+              "GET",
+              "HEAD"
+            ],
+            "Compress": false,
+            "CachePolicyId": {
+              "Ref": "CachePolicy"
+            },
+            "ResponseHeadersPolicyId": "67f7725c-6f97-4210-82d7-5512b31e9d03"
+          }
+        }
+      }
+    },
+    "InvokeUrlPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Condition": "HasCode",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "Function"
+        },
+        "Action": "lambda:InvokeFunctionUrl",
+        "FunctionUrlAuthType": "AWS_IAM",
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+        }
+      }
+    },
+    "InvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Condition": "HasCode",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "Function"
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "cloudfront.amazonaws.com",
+        "SourceArn": {
+          "Fn::Sub": "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+        }
+      }
+    },
+    "DrawFailures": {
+      "Type": "AWS::Logs::MetricFilter",
+      "Properties": {
+        "LogGroupName": {
+          "Ref": "Logs"
+        },
+        "FilterPattern": "\"\\\"status\\\":502\"",
+        "MetricTransformations": [
+          {
+            "MetricNamespace": "Cards",
+            "MetricName": "DrawFailures",
+            "MetricValue": "1",
+            "DefaultValue": 0
+          }
+        ]
+      }
+    },
+    "DrawFailuresAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "${AWS::StackName}-draw-failures"
+        },
+        "AlarmDescription": "The card maker could not draw three or more cards in 15 minutes.",
+        "Namespace": "Cards",
+        "MetricName": "DrawFailures",
+        "Statistic": "Sum",
+        "Period": 900,
+        "EvaluationPeriods": 1,
+        "Threshold": 3,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:weekly-thing-librarian-alarms"
+          }
+        ]
+      }
+    },
+    "ErrorsAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Condition": "HasCode",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "${AWS::StackName}-errors"
+        },
+        "AlarmDescription": "The card maker function crashed or timed out.",
+        "Namespace": "AWS/Lambda",
+        "MetricName": "Errors",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {
+              "Ref": "Function"
+            }
+          }
+        ],
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [
+          {
+            "Fn::Sub": "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:weekly-thing-librarian-alarms"
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "CodeBucket": {
+      "Value": {
+        "Ref": "CodeBucket"
+      },
+      "Description": "Private bucket for the packaged card maker"
+    },
+    "FunctionName": {
+      "Condition": "HasCode",
+      "Value": {
+        "Ref": "Function"
+      },
+      "Description": "The card maker"
+    },
+    "DistributionId": {
+      "Condition": "HasCode",
+      "Value": {
+        "Ref": "Distribution"
+      },
+      "Description": "The cards distribution"
+    },
+    "DistributionDomain": {
+      "Condition": "HasCode",
+      "Value": {
+        "Fn::GetAtt": [
+          "Distribution",
+          "DomainName"
+        ]
+      },
+      "Description": "Where cards.thingelstad.com points"
+    }
+  }
+}

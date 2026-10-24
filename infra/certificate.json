@@ -1,0 +1,21 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "cards.thingelstad.com HTTPS certificate with external DNS validation",
+  "Resources": {
+    "Certificate": {
+      "Type": "AWS::CertificateManager::Certificate",
+      "Properties": {
+        "DomainName": "cards.thingelstad.com",
+        "ValidationMethod": "DNS"
+      }
+    }
+  },
+  "Outputs": {
+    "CertificateArn": {
+      "Value": {
+        "Ref": "Certificate"
+      },
+      "Description": "cards.thingelstad.com HTTPS certificate"
+    }
+  }
+}
