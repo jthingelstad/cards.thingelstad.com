@@ -2,7 +2,8 @@
 //
 //   node tools/render.mjs <post URL or card path>... [--out=<dir>]
 //
-// Writes <slug>.png for each to --out (default .build/preview/). Fetches the
+// Takes blog posts, Weekly Thing issues and Another Thing episodes. Writes
+// <site>-<slug>.png for each to --out (default .build/preview/). Fetches the
 // posts and their photos; writes nothing anywhere else.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -19,19 +20,26 @@ if (!targets.length) {
   process.exit(2);
 }
 
+// A page's address as its card path: /www/..., /weekly/archive/<n>, /another/...
+function pathFor(url) {
+  const { origin, pathname } = new URL(url);
+  const site = Object.keys(SITES).find((id) => SITES[id].origin === origin);
+  if (!site) return url;
+  return `/${site}${pathname.replace(/\.html$/, '').replace(/\/$/, '')}.png`;
+}
+
 const dir = await stageAssets();
 await fs.mkdir(out, { recursive: true });
 for (const target of targets) {
-  const cardPath = target.startsWith('http')
-    ? `/www${new URL(target).pathname.replace(/\.html$/, '.png')}`
-    : target;
+  const cardPath = target.startsWith('http') ? pathFor(target) : target;
   const post = postFor(cardPath);
-  if (!post) throw new Error(`${target} is not a blog post`);
+  if (!post) throw new Error(`${target} is not a post, issue or episode`);
   const started = Date.now();
   const data = await fetchPost(post.url);
   if (!data) throw new Error(`${post.url}: no such post`);
-  const png = await render(cardFor(data, { site: SITES[post.site], photo: await fetchPhoto(data.photo) }), dir);
-  const file = path.join(out, `${path.basename(cardPath)}`);
+  const photo = await fetchPhoto(data.photo);
+  const png = await render(cardFor(data, { site: SITES[post.site], photo, kicker: post.kicker }), dir);
+  const file = path.join(out, `${post.site}-${path.basename(cardPath)}`);
   await fs.writeFile(file, png);
   console.log(`${file}  ${png.length} bytes  ${Date.now() - started} ms`);
 }

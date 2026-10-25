@@ -13,19 +13,43 @@ card too (the photo takes the right half).
 
     https://cards.thingelstad.com/www/2026/10/15/the-nnxyz-rooms.png?v=<hash>
 
-names https://www.thingelstad.com/2026/10/15/the-nnxyz-rooms.html. Only the
-blog (`www`) has cards so far; `SITES` in `src/post.mjs` is where another site
-would join. The theme (thing-hugo `partials/meta.html`, 2.0.19, live
+names https://www.thingelstad.com/2026/10/15/the-nnxyz-rooms.html. The
+theme (thing-hugo `partials/meta.html`, 2.0.19, live
 2026-10-24) sets `og:image` on every post to its card, with `?v=` a hash of
 the post's title, date, categories and text (micro.blog gives Hugo no
 last-edit date), so an edited post gets a new card.
 
+Weekly Thing issues and Another Thing episodes have cards too (2026-10-25;
+Jamie: "Weekly Thing and Another Thing issues should get custom share images
+with cards.thingelstad.com solution"). `SITES` in `src/post.mjs` is the list,
+and each site's own `base.njk` sets `og:image`, with `v` a hash of what the
+card shows:
+
+    https://cards.thingelstad.com/weekly/archive/353.png?v=<hash>
+    https://cards.thingelstad.com/another/2025/10/05/how-do-you-start-a.png?v=<hash>
+
+- **An issue** is drawn from its page's h-entry: the issue number as kicker,
+  the dek (`p-summary`) as its words, and the counts the page publishes as
+  `p-link-count` and `p-journal-count` ("19 links · 4 journal entries"). An
+  issue with a cover (`u-featured`, only `files.thingelstad.com/weekly-thing/`)
+  sets all of that in white over the cover, darkened top and bottom (Jamie:
+  "text overlaid on the issue image with the subtitle/dek included. Counts of
+  links and journal entries?"); the early issues with none get the white card
+  with the counts under the dek. An issue titled only with its date ("May 5,
+  2018") isn't dated twice.
+- **An episode** is the white card with its summary: no photo, since the
+  show's art is its own.
+- The blog reads its own words, never a `p-summary`. The site's label in the
+  band takes its sites-strip colour.
+
 ## How it works
 
 - `src/post.mjs` fetches the post and reads its h-entry (p-name, e-content,
-  dt-published, p-category) and its first uploaded photo, through micro.blog's
-  resizer. It fetches nothing but the blog and micro.blog's photo hosts, and
-  a post that redirects off the blog has no card.
+  dt-published, p-category, and for issues p-summary, u-featured and the
+  counts) and its photo: a blog post's first upload, through micro.blog's
+  resizer, or an issue's cover straight from `files.thingelstad.com`. It
+  fetches nothing but the three sites and those photo hosts, and a post that
+  redirects off its site has no card.
 - `src/card.mjs` is the layout, as the element tree Satori draws.
 - `src/render.mjs` draws it: Satori to SVG, resvg (WebAssembly) to PNG, with
   static Inter and Inter Tight WOFF from Fontsource 5.3.0 (Satori reads no WOFF2

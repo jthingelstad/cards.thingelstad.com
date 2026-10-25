@@ -2,11 +2,13 @@
 // CloudFront distribution (the function URL takes IAM auth, and only that
 // distribution may invoke it).
 //
-//   GET /www/<yyyy>/<mm>/<dd>/<slug>.png   the card for that blog post
+//   GET /www/<yyyy>/<mm>/<dd>/<slug>.png      the card for that blog post
+//   GET /weekly/archive/<n>.png               ... that Weekly Thing issue
+//   GET /another/<yyyy>/<mm>/<dd>/<slug>.png  ... that Another Thing episode
 //   GET /health                            the package this function runs
 //
 // A card is drawn once and kept: CloudFront holds it for a year, keyed on
-// the path and ?v=, which the theme sets from a hash of the post's words so
+// the path and ?v=, which each site sets from a hash of the post's words so
 // an edited post gets a new card. A post that doesn't exist is a 404, kept
 // for five minutes. One log line a request, never a post's words.
 import path from 'node:path';
@@ -58,8 +60,8 @@ export async function handler(event) {
       return text(404, 'No such post', 'public, max-age=300');
     }
     const photo = await fetchPhoto(post.photo);
-    const png = await render(cardFor(post, { site: SITES[target.site], photo }), DIR);
-    log(200, { bytes: png.length, photo: Boolean(photo), titled: Boolean(post.title) });
+    const png = await render(cardFor(post, { site: SITES[target.site], photo, kicker: target.kicker }), DIR);
+    log(200, { site: target.site, bytes: png.length, photo: Boolean(photo), titled: Boolean(post.title) });
     return {
       statusCode: 200,
       headers: {
