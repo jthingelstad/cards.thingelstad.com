@@ -37,7 +37,10 @@ for (const target of targets) {
   const started = Date.now();
   const data = await fetchPost(post.url);
   if (!data) throw new Error(`${post.url}: no such post`);
-  const photo = await fetchPhoto(data.photo);
+  const photo = await fetchPhoto(data.photo).catch((error) => {
+    console.warn(`${target}: drawn without its photo (${error.message})`);
+    return null;
+  });
   const png = await render(cardFor(data, { site: SITES[post.site], photo, kicker: post.kicker }), dir);
   const file = path.join(out, `${post.site}-${path.basename(cardPath)}`);
   await fs.writeFile(file, png);

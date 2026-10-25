@@ -48,8 +48,9 @@ card shows:
   dt-published, p-category, and for issues p-summary, u-featured and the
   counts) and its photo: a blog post's first upload, through micro.blog's
   resizer, or an issue's cover straight from `files.thingelstad.com`. It
-  fetches nothing but the three sites and those photo hosts, and a post that
-  redirects off its site has no card.
+  fetches nothing but the three sites and those photo hosts, follows a
+  redirect only within the host it started on (a post that redirects off its
+  site has no card), and reads no page past 2 MB or photo past 10 MB.
 - `src/card.mjs` is the layout, as the element tree Satori draws.
 - `src/render.mjs` draws it: Satori to SVG, resvg (WebAssembly) to PNG, with
   static Inter and Inter Tight WOFF from Fontsource 5.3.0 (Satori reads no WOFF2
@@ -58,31 +59,48 @@ card shows:
   nothing, never as a missing-glyph box. Other scripts the fonts lack (CJK,
   Arabic) still draw as boxes: no font is loaded for them.
 - `src/handler.mjs` is the Lambda: one function URL, IAM auth, invoked only by
-  its CloudFront distribution (origin access control). A card is drawn once and
-  CloudFront keeps it a year, keyed on the path and `v`; a missing post is a
-  404 kept five minutes. One JSON log line a request, never a post's words.
+  its CloudFront distribution (origin access control). It draws only the card
+  a page names: the page's `og:image` gives the `v`, and a request with any
+  other `v` (or none) gets a 302 to that one, kept five minutes, with nothing
+  drawn. A page whose `og:image` is not this card is a 404, so a site that
+  stops pointing at its card stops having one. A drawn card is kept a year,
+  keyed on the path and `v`, behind Origin Shield (us-east-1), so the edges
+  share one copy and a post going out is drawn about once, not once per edge
+  (before 2026-10-25 one post was drawn 12 times). A card whose photo
+  couldn't be had just now (unreachable, slow, a 5xx or 429) is kept five
+  minutes, so it gets drawn again with it; a photo that is gone or not
+  drawable is simply left out. A missing post is a 404 kept five minutes.
+  One JSON log line a request, never a post's words: `v`, `photo` (`drawn`,
+  `none`, `skipped`, `failed`), `photoMs` and `drawMs` on a drawn card.
 
 ## Working on it
 
-- `npm test` — paths, h-entry reading, excerpts, and a PNG of every card kind.
+- `npm test` — paths, h-entry reading, excerpts, a PNG of every card kind,
+  and (with fetch stubbed) the `v` check, redirects, size limits and photo
+  failures.
 - `npm run render -- <post URL>...` — draw real posts into `.build/preview/`.
   Look at the cards before shipping a layout change.
 - `npm run plan` / `npm run deploy` — the `cards` stack (`infra/cards.json`),
   as the cloud-engineer identity from this Mac (the script refuses any other).
   Deploy uploads the zip by content key and executes a change set; then it
-  reads `/health` through CloudFront until it reports the new key.
+  reads `/health` through CloudFront until it reports the new key, and clears
+  the whole cache (`/*`) for that key so every card is drawn again by the code
+  now live. The invalidation is keyed on the code key, so an unchanged deploy
+  or a rerun clears nothing twice. A cleared cache is drawn back on demand.
 - `npm run certificate` — the `cards-certificate` stack, printing the ACM
   validation record. DNS is at Namecheap and records there are Jamie's to add.
   Once the certificate is ISSUED, the next deploy gives the distribution its
   `cards.thingelstad.com` alias.
 
-The function's reserved concurrency (10) is the cost ceiling: anyone can ask
-for a card under a new `v`, and each miss is a render.
+The function's reserved concurrency (10) is the cost ceiling. A made-up `v`
+costs a page fetch and a 302, never a drawing; every drawn card is one a page
+names.
 
-Alarms (draw failures, function errors) go to
-`weekly-thing-librarian-alarms`, the queue-only topic the other sites use.
-They see only requests that reach the function, so DNS, the certificate and
-CloudFront are watched from outside: Jamie's updown.io check (2026-10-24; not
+Alarms (draw failures, function errors, and throttles: a request turned away
+at the ceiling never reaches the function, so only the throttle alarm sees it)
+go to `weekly-thing-librarian-alarms`, the queue-only topic the other sites use.
+None of them sees past Lambda, so DNS, the certificate and CloudFront are
+watched from outside: Jamie's updown.io check (2026-10-24; not
 Tinylytics, which has no page views here to count). `/health` is the path to
 check, never `/`, which is a 404 by design. Keep the ACM validation CNAME
 (`_599951081a9a6beba0c85c6a673beb51.cards`) at Namecheap: renewal needs it.

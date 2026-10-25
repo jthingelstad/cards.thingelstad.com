@@ -17,6 +17,14 @@
 //
 // The zip's key, code/<sha256>.zip, hashes the files, not the zip's bytes, so
 // an apply with nothing changed in the code or the template has nothing to do.
+//
+// Once /health reports the key, apply clears the whole cache (one /*
+// invalidation, edges and Origin Shield both) for that key, so every card is
+// drawn again by the code now live; otherwise a layout change would reach
+// only cards not yet drawn. The invalidation's CallerReference is the key, so
+// CloudFront makes one per key: an apply of unchanged code, or a rerun after a
+// failed one, gets the existing invalidation back and clears nothing again.
+import { CloudFrontClient, CreateInvalidationCommand, waitUntilInvalidationCompleted } from '@aws-sdk/client-cloudfront';
 import {
   CloudFormationClient,
   CreateChangeSetCommand,
@@ -243,7 +251,22 @@ async function apply() {
     }
   }
   if (reported !== Key) throw new Error(`${health} reports ${reported}, not ${Key}`);
-  console.log(JSON.stringify({ stack: StackName, code: Key, ...live }, null, 2));
+
+  const cloudfront = new CloudFrontClient(settings);
+  const { Invalidation } = await cloudfront.send(
+    new CreateInvalidationCommand({
+      DistributionId: live.distributionId,
+      InvalidationBatch: { CallerReference: Key, Paths: { Quantity: 1, Items: ['/*'] } },
+    }),
+  );
+  if (Invalidation.Status !== 'Completed') {
+    console.log(`Clearing the cache for ${Key} (invalidation ${Invalidation.Id})`);
+    await waitUntilInvalidationCompleted(
+      { client: cloudfront, maxWaitTime: 900 },
+      { DistributionId: live.distributionId, Id: Invalidation.Id },
+    );
+  }
+  console.log(JSON.stringify({ stack: StackName, code: Key, cleared: Invalidation.Id, ...live }, null, 2));
 }
 
 await (mode === 'certificate' ? certificate() : apply());
