@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cardFor, durationLabel, excerpt, fitSize, formatDate, HEIGHT, WIDTH } from '../src/card.mjs';
-import { SITES } from '../src/post.mjs';
+import jpeg from 'jpeg-js';
+import { dimensions, SITES } from '../src/post.mjs';
 import { emojiAsset, emojiFiles, render } from '../src/render.mjs';
 import { stageAssets } from '../tools/package.mjs';
 
@@ -152,6 +153,41 @@ test('the front page card carries its hero line, accent and archive size', () =>
   const bare = JSON.stringify(cardFor({ ...HOME, headline: [], counts: { issues: 0, links: 0 } }, { site: SITES.weekly, photo: null }));
   assert.doesNotMatch(bare, /issues/);
   assert.match(bare, /"whiteSpace":"pre"},"children":"Weekly Thing"/);
+});
+
+// A 1200 x 900 photo: a gradient with grain, so it compresses like one.
+function photo() {
+  const [width, height] = [1200, 900];
+  const data = Buffer.alloc(width * height * 4);
+  let seed = 7;
+  for (let i = 0; i < width * height; i++) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    const grain = (seed % 33) - 16;
+    const [x, y] = [i % width, Math.floor(i / width)];
+    data.set([(x * 200) / width + 40 + grain, (y * 160) / height + 60 + grain, 120 + grain, 255], i * 4);
+  }
+  const bytes = Buffer.from(jpeg.encode({ data, width, height }, 90).data);
+  return { bytes, src: `data:image/jpeg;base64,${bytes.toString('base64')}` };
+}
+
+test('an image says its size in its header', () => {
+  assert.deepEqual(dimensions(Buffer.from(DOT.split(',')[1], 'base64')), { width: 1, height: 1 });
+  assert.deepEqual(dimensions(photo().bytes), { width: 1200, height: 900 });
+  assert.deepEqual(dimensions(Buffer.from('GIF89a')), {});
+  assert.deepEqual(dimensions(Buffer.from([0xff, 0xd8, 0xff, 0xd9])), {});
+});
+
+test('a card with a photo is a 1200 x 630 JPEG, under Bluesky\'s 1 MB', async () => {
+  const dir = await stageAssets();
+  const { src } = photo();
+  const issue = { title: 'Release Notes for Every Day', text: 'Words.', published: '2026-10-10T12:00:00Z', categories: [], counts: { links: 19, journal: 4 } };
+  const post = { title: '', text: 'Red leaves today.', published: '2026-10-24T12:00:00Z', categories: [] };
+  for (const [card, site] of [[issue, SITES.weekly], [post, SITES.www]]) {
+    const image = await render(cardFor(card, { site, photo: { src, width: 1200, height: 900 } }), dir, { format: 'jpeg' });
+    assert.deepEqual([...image.subarray(0, 2)], [0xff, 0xd8]);
+    assert.deepEqual(dimensions(image), { width: WIDTH, height: HEIGHT });
+    assert.ok(image.length < 1_000_000, `${image.length} bytes`);
+  }
 });
 
 const emoji = (...points) => String.fromCodePoint(...points);

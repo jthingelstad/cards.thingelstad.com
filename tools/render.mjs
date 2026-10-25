@@ -3,7 +3,7 @@
 //   node tools/render.mjs <post URL or card path>... [--out=<dir>]
 //
 // Takes blog posts, Weekly Thing issues and Another Thing episodes. Writes
-// <site>-<slug>.png for each to --out (default .build/preview/). Fetches the
+// <site>-<slug>.png (or .jpg, for a card with a photo) for each to --out (default .build/preview/). Fetches the
 // posts and their photos; writes nothing anywhere else.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -43,8 +43,9 @@ for (const target of targets) {
     console.warn(`${target}: drawn without its photo (${error.message})`);
     return null;
   });
-  const png = await render(cardFor(data, { site: SITES[post.site], photo, kicker: post.kicker }), dir);
-  const file = path.join(out, `${post.site}-${path.basename(cardPath)}`);
-  await fs.writeFile(file, png);
-  console.log(`${file}  ${png.length} bytes  ${Date.now() - started} ms`);
+  const format = photo ? 'jpeg' : 'png';
+  const image = await render(cardFor(data, { site: SITES[post.site], photo, kicker: post.kicker }), dir, { format });
+  const file = path.join(out, `${post.site}-${path.basename(cardPath, '.png')}.${format === 'jpeg' ? 'jpg' : 'png'}`);
+  await fs.writeFile(file, image);
+  console.log(`${file}  ${image.length} bytes  ${Date.now() - started} ms`);
 }

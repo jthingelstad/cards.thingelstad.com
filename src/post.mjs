@@ -335,5 +335,29 @@ export async function fetchPhoto(src) {
   return {
     src: `data:${response.type};base64,${response.body.toString('base64')}`,
     screenshot: /\.png(\?.*)?$/i.test(src),
+    ...dimensions(response.body),
   };
+}
+
+/** A JPEG's or PNG's size in pixels, from its header: { width, height }, or
+ * {} when the header can't be read (a GIF, a broken file). */
+export function dimensions(data) {
+  if (data.length >= 24 && data.readUInt32BE(0) === 0x89504e47)
+    return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+  if (data[0] !== 0xff || data[1] !== 0xd8) return {};
+  // A JPEG: walk its segments to the frame header (SOF0 to SOF15, which are
+  // C0 to CF less DHT C4, JPG C8 and DAC CC).
+  for (let at = 2; at + 9 <= data.length; ) {
+    if (data[at] !== 0xff) return {};
+    const marker = data[at + 1];
+    if (marker === 0xff) {
+      at += 1;
+      continue;
+    }
+    if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker))
+      return { height: data.readUInt16BE(at + 5), width: data.readUInt16BE(at + 7) };
+    if (marker === 0xd9 || marker === 0xda) return {};
+    at += 2 + data.readUInt16BE(at + 2);
+  }
+  return {};
 }
