@@ -10,10 +10,12 @@ test('each site takes its origin and label from shared/sites.json', () => {
       ['www', 'https://www.thingelstad.com', 'Blog', 'thingelstad.com'],
       ['weekly', 'https://weekly.thingelstad.com', 'Newsletter', 'weekly.thingelstad.com'],
       ['another', 'https://another.thingelstad.com', 'Podcast', 'another.thingelstad.com'],
+      ['links', 'https://links.thingelstad.xyz', 'Links', 'links.thingelstad.xyz'],
     ],
   );
   assert.equal(OWNER, 'Jamie Thingelstad');
   assert.equal(siteAt('https://weekly.thingelstad.com/archive/353/'), SITES.weekly);
+  assert.equal(siteAt('https://links.thingelstad.xyz/links/dec34be50cef/'), SITES.links);
   assert.equal(siteAt('https://thingelstad.xyz/things/thingy/'), null);
 });
 

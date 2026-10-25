@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cardFor, durationLabel, excerpt, fitSize, formatDate, HEIGHT, WIDTH } from '../src/card.mjs';
+import { cardFor, clip, durationLabel, excerpt, fitSize, formatDate, HEIGHT, WIDTH } from '../src/card.mjs';
 import jpeg from 'jpeg-js';
 import { dimensions } from '../src/post.mjs';
 import { SITES } from '../src/sites.mjs';
@@ -46,6 +46,16 @@ const HOME = {
   counts: { issues: 353, links: 6510 },
 };
 
+const LINK = {
+  title: 'Mandelnaut — Making Fractal Wallpapers',
+  text: 'I love the Mandelbrot fractal.',
+  published: '2026-10-09T01:29:08Z',
+  categories: [],
+  photo: null,
+  host: 'techmatt.github.io',
+  issues: ['WT353'],
+};
+
 test('every kind of card draws a 1200 x 630 PNG', async () => {
   const dir = await stageAssets();
   const posts = [
@@ -69,6 +79,8 @@ test('every kind of card draws a 1200 x 630 PNG', async () => {
   for (const [post, opts] of [
     [issue, { site: SITES.weekly, photo: null, kicker: 'WT1' }],
     [episode, { site: SITES.another, photo: null }],
+    [LINK, { site: SITES.links, photo: null }],
+    [{ ...LINK, text: '', issues: [] }, { site: SITES.links, photo: null }],
     [HOME, { site: SITES.weekly, photo: { src: DOT } }],
     [HOME, { site: SITES.weekly, photo: null }],
   ]) {
@@ -202,4 +214,21 @@ test('an emoji finds its Twemoji file', async () => {
   assert.match(await load('emoji', emoji(0x2764, 0xfe0f, 0x200d, 0x1f525)), /^data:image\/svg\+xml;base64,/);
   assert.notEqual(await load('emoji', emoji(0x1f342)), await load('emoji', emoji(0x10ffff)));
   assert.deepEqual(await load('ja-JP', 'こんにちは'), []);
+});
+
+test('a link card reads as its record: the day saved, its issues, host, title and note', () => {
+  const words = JSON.stringify(cardFor(LINK, { site: SITES.links, photo: null }));
+  for (const said of ['Saved October 8, 2026', 'In WT353', 'techmatt.github.io', LINK.title, LINK.text])
+    assert.ok(words.includes(`"children":"${said}"`), said);
+  assert.match(words, /"color":"#0000ee","textDecoration":"underline"/);
+  assert.match(words, /"color":"#16161a"},"children":"Links"/);
+});
+
+test('a title too long for its lines is cut at a word, never clamped', () => {
+  assert.equal(clip('Short title', 20), 'Short title');
+  assert.equal(clip('Vision Pro is an over-engineered devkit // Hardware bleeds genius', 45), 'Vision Pro is an over-engineered devkit…');
+  const long = 'Dumb refrigerator, meet Smarter FridgeCam '.repeat(6);
+  const words = JSON.stringify(cardFor({ ...LINK, title: long, text: '' }, { site: SITES.links, photo: null }));
+  const title = JSON.parse(words).props.children[0].props.children[1].props.children[1].props.children;
+  assert.ok(title.endsWith('…') && title.length < long.length, title);
 });
