@@ -9,8 +9,9 @@
 //
 // A card is drawn only as its page names it: the page's og:image carries the
 // v its site hashed from what the card shows, so an edited post gets a new
-// card. A request with any other v (or none) is sent to the card the page
-// names, kept five minutes, and nothing is drawn; a page whose og:image is
+// card. A request with any other query (another v, none, or a second one) is
+// sent to the card the page names, kept five minutes, and nothing is drawn;
+// a page whose og:image is
 // not this card has none here. A drawn card is kept a year, keyed on the path
 // and v, behind Origin Shield so the edges share one copy; one whose photo
 // couldn't be had just now is kept five minutes, so it is drawn again with
@@ -61,7 +62,8 @@ export async function handler(event) {
     log(404);
     return text(404, 'Not a card', BRIEF);
   }
-  const v = new URLSearchParams(event.rawQueryString ?? '').get('v') ?? '';
+  const query = event.rawQueryString ?? '';
+  const v = new URLSearchParams(query).get('v') ?? '';
   try {
     const post = await fetchPost(target.url);
     if (!post) {
@@ -73,11 +75,15 @@ export async function handler(event) {
       log(404, { reason: 'not named', v });
       return text(404, 'The page names no card here', BRIEF);
     }
-    if (named !== v) {
-      log(302, { reason: 'other v', v, named });
+    // The query must be exactly the one the page names: CloudFront keys every
+    // v it is given (?v=<named>&v=x, an escaped copy of the hash), so a
+    // second spelling would be a second drawing of the same card.
+    const canonical = named ? `v=${encodeURIComponent(named)}` : '';
+    if (query !== canonical) {
+      log(302, { reason: 'other v', query: query.slice(0, 200), named });
       return {
         statusCode: 302,
-        headers: { location: named ? `${route}?v=${encodeURIComponent(named)}` : route, 'cache-control': BRIEF },
+        headers: { location: named ? `${route}?${canonical}` : route, 'cache-control': BRIEF },
         body: '',
       };
     }
