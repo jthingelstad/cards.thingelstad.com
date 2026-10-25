@@ -61,8 +61,9 @@ card shows:
 - `src/handler.mjs` is the Lambda: one function URL, IAM auth, invoked only by
   its CloudFront distribution (origin access control). It draws only the card
   a page names: the page's `og:image` gives the `v`, and a request with any
-  other `v` (or none) gets a 302 to that one, kept five minutes, with nothing
-  drawn. A page whose `og:image` is not this card is a 404, so a site that
+  other query (another `v`, none, a second `v`, or the hash escaped) gets a
+  302 to that one, kept five minutes, with nothing drawn: CloudFront keys
+  every `v` it is given, so each spelling would be another drawing. A page whose `og:image` is not this card is a 404, so a site that
   stops pointing at its card stops having one. A drawn card is kept a year,
   keyed on the path and `v`, behind Origin Shield (us-east-1), so the edges
   share one copy and a post going out is drawn about once, not once per edge

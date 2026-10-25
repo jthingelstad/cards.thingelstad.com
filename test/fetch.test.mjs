@@ -130,12 +130,23 @@ const quiet = (t) => t.mock.method(console, 'log', () => {});
 test('a card asked for with another v, or none, is sent to the one the page names', async (t) => {
   quiet(t);
   serve({ [POST]: () => html(ENTRY, og(`https://cards.thingelstad.com${CARD}?v=ae477a0f1b`)) });
-  for (const query of ['v=0000000000', '', 'v=']) {
+  // A second v, or the same hash spelled another way, is another cache key.
+  for (const query of ['v=0000000000', '', 'v=', 'v=ae477a0f1b&v=x', 'v=ae477a0f1b&v=ae477a0f1b', 'v=%61e477a0f1b']) {
     const answer = await handler(request(CARD, query));
     assert.equal(answer.statusCode, 302, query);
     assert.equal(answer.headers.location, `${CARD}?v=ae477a0f1b`);
     assert.equal(answer.headers['cache-control'], 'public, max-age=300');
   }
+});
+
+test('the card a page names is drawn, never sent on', async (t) => {
+  quiet(t);
+  const entry = `<article class="h-entry"><div class="e-content"><p>Red leaves.</p><img src="${UPLOAD}"></div></article>`;
+  const asked = serve({ [POST]: () => html(entry, og(`https://cards.thingelstad.com${CARD}?v=ae477a0f1b`)), [RESIZED]: jpeg });
+  const answer = await handler(request(CARD, 'v=ae477a0f1b'));
+  assert.notEqual(answer.statusCode, 302);
+  // Past the check: it went on to fetch the photo to draw.
+  assert.deepEqual(asked, [POST, RESIZED]);
 });
 
 test('a page whose og:image is not this card has no card here', async (t) => {
@@ -151,7 +162,9 @@ test('a page whose og:image is not this card has no card here', async (t) => {
 test('a page that names its card with no v is sent there without one', async (t) => {
   quiet(t);
   serve({ [POST]: () => html(ENTRY, og(`https://cards.thingelstad.com${CARD}`)) });
-  const answer = await handler(request(CARD, 'v=abc'));
-  assert.equal(answer.statusCode, 302);
-  assert.equal(answer.headers.location, CARD);
+  for (const query of ['v=abc', 'v=']) {
+    const answer = await handler(request(CARD, query));
+    assert.equal(answer.statusCode, 302, query);
+    assert.equal(answer.headers.location, CARD);
+  }
 });
