@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { firstPhoto, plainText, postFor, readPost } from '../src/post.mjs';
+import { firstPhoto, headlineLines, plainText, postFor, readPost } from '../src/post.mjs';
 
 test('a card path names a blog post', () => {
   assert.deepEqual(postFor('/www/2026/10/15/the-nnxyz-rooms.png'), {
@@ -17,6 +17,7 @@ test('a card path names a Weekly Thing issue or an Another Thing episode', () =>
     kicker: 'WT353',
   });
   assert.equal(postFor('/weekly/archive/140-special.png')?.kicker, 'WT140 special');
+  assert.deepEqual(postFor('/weekly/index.png'), { site: 'weekly', url: 'https://weekly.thingelstad.com/', home: true });
   assert.deepEqual(postFor('/another/2025/10/05/how-do-you-start-a.png'), {
     site: 'another',
     url: 'https://another.thingelstad.com/2025/10/05/how-do-you-start-a.html',
@@ -128,6 +129,49 @@ test('an issue reads its summary and cover; an episode its summary and no photo'
   );
   assert.equal(episode.text, 'Stepping into podcasting.');
   assert.equal(episode.photo, null);
+  assert.deepEqual(episode.episode, { number: 0, seconds: 0 });
+  assert.equal(issue.episode, null);
+
+  const numbered = readPost(
+    page(`<article class="h-entry"><h1 class="p-name">How do you start a podcast?</h1>
+      <data class="p-episode" value="1"></data><data class="p-duration" value="635"></data></article>`),
+    'https://another.thingelstad.com/2025/10/05/how-do-you-start-a.html',
+  );
+  assert.deepEqual(numbered.episode, { number: 1, seconds: 635 });
+});
+
+test('the newsletter front page reads its h-feed', () => {
+  const home = readPost(
+    page(`<section class="home-hero h-feed">
+      <data class="p-name" value="Weekly Thing"></data>
+      <p class="eyebrow p-kicker">Weekend reading since 2017</p>
+      <h1 class="e-summary">A weekend letter<br>about <em>what I&rsquo;m</em><br><em>learning.</em></h1>
+      <data class="u-featured" value="https://files.thingelstad.com/weekly-thing/353/cover.jpg"></data>
+      <data class="p-issue-count" value="353"></data><data class="p-link-count" value="6510"></data>
+    </section>
+    <footer><a class="h-card" href="https://www.thingelstad.com/">Jamie Thingelstad</a></footer>`),
+    'https://weekly.thingelstad.com/',
+    { home: true },
+  );
+  assert.equal(home.home, true);
+  assert.equal(home.title, 'Weekly Thing');
+  assert.equal(home.kicker, 'Weekend reading since 2017');
+  assert.deepEqual(home.headline, [
+    [{ text: 'A weekend letter', accent: false }],
+    [{ text: 'about ', accent: false }, { text: 'what I’m', accent: true }],
+    [{ text: 'learning.', accent: true }],
+  ]);
+  assert.equal(home.photo, 'https://files.thingelstad.com/weekly-thing/353/cover.jpg');
+  assert.deepEqual(home.counts, { issues: 353, links: 6510 });
+  assert.throws(() => readPost(page('<p>Hello</p>'), 'https://weekly.thingelstad.com/', { home: true }), /no h-feed/);
+});
+
+test('a headline keeps its line breaks and its accent', () => {
+  assert.deepEqual(headlineLines('One<br/>two <strong>three</strong>  four'), [
+    [{ text: 'One', accent: false }],
+    [{ text: 'two ', accent: false }, { text: 'three', accent: true }, { text: ' four', accent: false }],
+  ]);
+  assert.deepEqual(headlineLines(''), []);
 });
 
 test('a blog post reads its own words, never a summary', () => {
