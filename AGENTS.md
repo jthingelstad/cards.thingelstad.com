@@ -74,6 +74,15 @@ card.
   line Satori clamps loses its underline. No photo.
 - The blog reads its own words, never a `p-summary`. The site's label in the
   band takes its sites-strip colour.
+- **A blog photo post** sets its words in white over its photo, the way an
+  issue sits on its cover (Jamie, 2026-10-24: "I think we can do image
+  overlay on blog previews too"), when the photo is wide (at least 1.3 wide
+  for each 1 high), isn't a screenshot, its size is known, and the post has a
+  title or is a micropost of 80 characters or fewer: the headline large, a
+  title's text under it. Any other photo post keeps the split card, the photo
+  on the right half. `overPhoto` in `src/card.mjs` is that rule; `OVERLAY`
+  holds its three settings (`wide`, `words`, and `top`, how dark the top of
+  the photo is, which issue covers share), each one Jamie's call.
 
 ## How it works
 
@@ -166,9 +175,12 @@ maker ships first, so the page never names a card it can't draw):
 - `npm run sites:sync` — copy the domain's `shared/sites.json` in, after it
   changes there.
 - `npm run render -- <post URL>...` — draw real posts into `.build/preview/`
-  (`.jpg` for a card with a photo). `--root=<dir>` reads the pages from a
-  site's local build (its `dist/`) instead of the live site, to see a page's
-  card before the page that names it ships.
+  (`.jpg` for a card with a photo). `--out=<dir>` writes elsewhere.
+  `--root=<dir>` reads the pages from a site's local build (its `dist/`)
+  instead of the live site, to see a page's card before the page that names
+  it ships. `--overlay='{"wide":0.95,"words":150,"top":0.6}'` draws the blog
+  overlay with other settings than `OVERLAY`, to compare them; the run says
+  which posts went over their photo.
   Look at the cards before shipping a layout change.
 - `npm run plan` / `npm run deploy` — the `cards` stack (`infra/cards.json`),
   as the cloud-engineer identity from this Mac (the script refuses any other).

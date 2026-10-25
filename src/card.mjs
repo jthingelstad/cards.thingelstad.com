@@ -6,7 +6,8 @@
 // Thingelstad, then the site's label) with the host on the right. A titled
 // post shows its title and the start of its text; a micropost shows its own
 // words, smaller and lighter the longer they run; a post with a photo gives
-// the photo the right half. Black and white, as the blog is.
+// the photo the right half, or with a wide photo and a headline's worth of
+// words is drawn over it (overPhoto). Black and white, as the blog is.
 //
 // Decided with Jamie, 2026-10-24: the full canvas, no photo of Jamie, and
 // photo posts get this card too. Weekly Thing issues and Another Thing
@@ -166,13 +167,44 @@ const darkCard = (backdrop, words, site) =>
     band(site),
   );
 
-// An issue over its cover: the photo fills the card above the band, darkened
-// at the top for the kicker and toward the bottom for the words. With no
-// cover, the newsletter's blue under its W.
-function overCover(post, { site, photo, meta, counts }) {
+// The blog's photo posts over their photo (Jamie, 2026-10-25: "I think we
+// can do image overlay on blog previews too"), when the photo is wide enough
+// to fill the card and the words are a headline. These are Jamie's three
+// calls on it:
+export const OVERLAY = Object.freeze({
+  // The narrowest photo drawn over, width / height: 1.3 keeps 4:3 and wider,
+  // so a square or tall photo keeps the half it has, uncropped.
+  wide: 1.3,
+  // The longest micropost drawn over, in characters. A titled post always
+  // is; a longer micropost keeps the split card, its words on white.
+  words: 80,
+  // How dark the top of a photo is, under the date (and on every cover).
+  top: 0.72,
+});
+
+/** Whether a blog post is drawn over its photo rather than beside it. */
+export function overPhoto(post, photo, overlay = OVERLAY) {
+  if (!photo || photo.screenshot || !(photo.width > 0 && photo.height > 0)) return false;
+  if (photo.width / photo.height < overlay.wide) return false;
+  return Boolean(post.title) || (Boolean(post.text) && post.text.length <= overlay.words);
+}
+
+const shade = (alpha) => `rgba(10,10,14,${alpha})`;
+
+// A post over its photo, as an issue over its cover: the photo fills the card
+// above the band, darkened at the top for the date and toward the bottom for
+// the words. A titled post shows its title and the start of its text; a
+// micropost its own words as the headline. An issue with no cover is drawn on
+// the newsletter's blue under its W.
+function overCover(post, { site, photo, meta, counts, top }) {
   const width = WIDTH - 2 * PAD;
-  const n = post.title.length;
-  const size = fitSize(n <= 28 ? 88 : n <= 56 ? 72 : 60, post.title, width, 0.64);
+  const headline = post.title || post.text;
+  const n = headline.length;
+  // A micropost past 90 characters (only when OVERLAY.words lets one in)
+  // steps down once more and takes a fourth line.
+  const long = !post.title && n > 90;
+  const size = fitSize(long ? 48 : n <= 28 ? 88 : n <= 56 ? 72 : 60, headline, width, 0.64);
+  const body = post.title ? post.text : '';
   const shadow = photo ? '0 2px 18px rgba(0, 0, 0, 0.45)' : '0 2px 12px rgba(4, 20, 50, 0.35)';
   const backdrop = photo
     ? [
@@ -180,8 +212,7 @@ function overCover(post, { site, photo, meta, counts }) {
         h('div', {
           ...FILL,
           display: 'flex',
-          backgroundImage:
-            'linear-gradient(180deg, rgba(10,10,14,0.6) 0%, rgba(10,10,14,0) 28%, rgba(10,10,14,0.2) 45%, rgba(10,10,14,0.9) 100%)',
+          backgroundImage: `linear-gradient(180deg, ${shade(top)} 0%, ${shade(top / 3)} 15%, ${shade(0)} 30%, ${shade(0.2)} 47%, ${shade(0.9)} 100%)`,
         }),
       ]
     : [
@@ -191,7 +222,7 @@ function overCover(post, { site, photo, meta, counts }) {
   return darkCard(
     backdrop,
     tree('div', { ...FILL, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxSizing: 'border-box', padding: `46px ${PAD}px 40px ${PAD}px`, color: WHITE, textShadow: shadow }, [
-        h('div', { display: 'block', fontSize: 24, fontWeight: 700, letterSpacing: '0.04em', color: photo ? WHITE : WT.pale }, meta || ' '),
+        h('div', { display: 'block', fontSize: 24, fontWeight: 700, letterSpacing: '0.04em', color: photo ? WHITE : WT.pale, lineClamp: 2 }, meta || ' '),
         tree('div', { display: 'flex', flexDirection: 'column', width }, [
           h(
             'div',
@@ -204,15 +235,16 @@ function overCover(post, { site, photo, meta, counts }) {
               letterSpacing: '-0.025em',
               // Not 'balance': with a clamp, Satori balances for one line
               // more than it keeps and cuts the title at half the width.
-              lineClamp: 2,
+              // A micropost's words get a third line, having no text under.
+              lineClamp: body ? 2 : long ? 4 : 3,
             },
-            post.title,
+            headline,
           ),
-          post.text &&
+          body &&
             h(
               'div',
               { display: 'block', marginTop: 20, fontSize: 27, lineHeight: 1.4, fontWeight: 500, lineClamp: 2 },
-              excerpt(post.text, 170),
+              excerpt(body, 170),
             ),
           counts && h('div', { display: 'block', marginTop: 18, fontSize: 22, fontWeight: 700, letterSpacing: '0.02em' }, counts),
         ]),
@@ -552,19 +584,23 @@ function linkCard(post, { site }) {
 
 // The layouts a site's entry names (sites.mjs).
 const LAYOUTS = {
-  post: postCard,
-  issue: (post, { site, photo, meta }) => overCover(post, { site, photo, meta, counts: countsLine(post.counts) }),
+  // A blog post over its photo when overPhoto says so, else beside it.
+  post: (post, { site, photo, meta, rule }) =>
+    overPhoto(post, photo, rule) ? overCover(post, { site, photo, meta, counts: '', top: rule.top }) : postCard(post, { site, photo, meta }),
+  issue: (post, { site, photo, meta, rule }) => overCover(post, { site, photo, meta, counts: countsLine(post.counts), top: rule.top }),
   episode: episodeCard,
   link: linkCard,
 };
 
-/** The element tree for a post's card. photo is fetchPhoto's result or null. */
-export function cardFor(post, { site, photo, kicker }) {
+/** The element tree for a post's card. photo is fetchPhoto's result or null;
+ * overlay changes OVERLAY, for a preview of another answer (npm run render
+ * --overlay=...), never on the Lambda. */
+export function cardFor(post, { site, photo, kicker, overlay }) {
   if (post.home) return homeCard(post, { site, photo });
   const layout = LAYOUTS[site.layout];
   if (!layout) throw new Error(`${site.id} names no layout here (${site.layout})`);
   // An early issue titled only with its date ("May 5, 2018") isn't dated twice.
   const date = formatDate(post.published);
   const meta = [kicker, date === post.title ? '' : date, ...post.categories.slice(0, 3)].filter(Boolean).join(' · ');
-  return layout(post, { site, photo, meta });
+  return layout(post, { site, photo, meta, rule: { ...OVERLAY, ...overlay } });
 }

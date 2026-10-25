@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cardFor, clip, durationLabel, excerpt, fitSize, formatDate, HEIGHT, WIDTH } from '../src/card.mjs';
+import { cardFor, clip, durationLabel, excerpt, fitSize, formatDate, HEIGHT, OVERLAY, overPhoto, WIDTH } from '../src/card.mjs';
 import jpeg from 'jpeg-js';
 import { dimensions } from '../src/post.mjs';
 import { SITES } from '../src/sites.mjs';
@@ -201,6 +201,45 @@ test('a card with a photo is a 1200 x 630 JPEG, under Bluesky\'s 1 MB', async ()
     assert.deepEqual(dimensions(image), { width: WIDTH, height: HEIGHT });
     assert.ok(image.length < 1_000_000, `${image.length} bytes`);
   }
+});
+
+const WIDE = { src: DOT, width: 1200, height: 900 };
+
+test('a blog post is drawn over its photo when the photo is wide and the words a headline', () => {
+  const micro = { title: '', text: 'Red leaves today.' };
+  assert.equal(overPhoto(micro, WIDE), true);
+  assert.equal(overPhoto({ title: 'Art Shanty Projects', text: 'Words. '.repeat(60) }, WIDE), true);
+  // A square or tall photo, a screenshot, a photo of unknown size, or more
+  // words than a headline: beside it, as before.
+  assert.equal(overPhoto(micro, { ...WIDE, height: 1200 }), false);
+  assert.equal(overPhoto(micro, { ...WIDE, width: 900 }), false);
+  assert.equal(overPhoto(micro, { ...WIDE, screenshot: true }), false);
+  assert.equal(overPhoto(micro, { src: DOT }), false);
+  assert.equal(overPhoto({ title: '', text: 'x'.repeat(OVERLAY.words + 1) }, WIDE), false);
+  assert.equal(overPhoto({ title: '', text: 'x'.repeat(OVERLAY.words) }, WIDE), true);
+  assert.equal(overPhoto(micro, null), false);
+  // Another answer, as a preview asks for it.
+  assert.equal(overPhoto(micro, { ...WIDE, height: 1200 }, { ...OVERLAY, wide: 0.95 }), true);
+});
+
+test('over its photo, a micropost is its own headline and a titled post keeps its text', () => {
+  const base = { published: '2026-10-24T12:00:00Z', categories: ['Photos'] };
+  const micro = JSON.stringify(cardFor({ ...base, title: '', text: 'Red leaves today.' }, { site: SITES.www, photo: WIDE }));
+  assert.match(micro, /"position":"absolute"/);
+  assert.match(micro, /"fontFamily":"Inter Tight","fontWeight":800,"fontSize":88[^}]*"lineClamp":3},"children":"Red leaves today\."/);
+  assert.match(micro, /"children":"October 24, 2026 · Photos"/);
+  assert.match(micro, /rgba\(10,10,14,0\.72\) 0%/);
+  const titled = JSON.stringify(
+    cardFor({ ...base, title: 'Art Shanty Projects', text: 'We walked the lake. '.repeat(20) }, { site: SITES.www, photo: WIDE }),
+  );
+  assert.match(titled, /"lineClamp":2},"children":"Art Shanty Projects"/);
+  assert.match(titled, /"children":"We walked the lake\./);
+  // Beside a square photo, as before: no layer over it.
+  const square = JSON.stringify(cardFor({ ...base, title: '', text: 'Red leaves today.' }, { site: SITES.www, photo: { ...WIDE, height: 1200 } }));
+  assert.doesNotMatch(square, /"position":"absolute"/);
+  // A longer micropost, when the limit lets one in, steps down to fit.
+  const long = JSON.stringify(cardFor({ ...base, title: '', text: 'word '.repeat(28).trim() }, { site: SITES.www, photo: WIDE, overlay: { words: 150 } }));
+  assert.match(long, /"fontSize":48[^}]*"lineClamp":4/);
 });
 
 const emoji = (...points) => String.fromCodePoint(...points);
