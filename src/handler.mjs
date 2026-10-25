@@ -97,11 +97,15 @@ export async function handler(event) {
       state = 'failed';
     }
     const drawStart = Date.now();
-    const png = await render(cardFor(post, { site: SITES[target.site], photo, kicker: target.kicker }), DIR);
+    // A card with a photo is a JPEG, kept under Bluesky's 1 MB; one of type
+    // and colour stays PNG. Either is served at its .png path.
+    const format = photo ? 'jpeg' : 'png';
+    const image = await render(cardFor(post, { site: SITES[target.site], photo, kicker: target.kicker }), DIR, { format });
     log(200, {
       site: target.site,
       v,
-      bytes: png.length,
+      format,
+      bytes: image.length,
       photo: state,
       photoMs: drawStart - photoStart,
       drawMs: Date.now() - drawStart,
@@ -109,8 +113,8 @@ export async function handler(event) {
     });
     return {
       statusCode: 200,
-      headers: { 'content-type': 'image/png', 'cache-control': state === 'failed' ? BRIEF : YEAR },
-      body: png.toString('base64'),
+      headers: { 'content-type': `image/${format}`, 'cache-control': state === 'failed' ? BRIEF : YEAR },
+      body: image.toString('base64'),
       isBase64Encoded: true,
     };
   } catch (error) {

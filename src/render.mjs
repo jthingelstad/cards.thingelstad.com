@@ -1,6 +1,12 @@
 // Draw a card: Satori lays the element tree out as SVG with the fonts, and
 // resvg (WebAssembly, so the same bytes run on this Mac and on Lambda) turns
-// that into a PNG.
+// that into pixels, and those into a PNG, or a JPEG for a card with a photo.
+//
+// A photo card as PNG runs 0.6 to 1.5 MB, past Bluesky's 1,000,000-byte limit
+// for a link card's image; as a JPEG (jpeg-js, pure JavaScript, quality 82,
+// no chroma subsampling, so white type over a photo keeps its edges) it is a
+// fifth of that or less. A card of type and flat colour stays PNG, which is
+// smaller and sharper there.
 //
 // The fonts are static Inter (400, 500, 600) and Inter Tight (700, 800) from
 // Fontsource 5.3.0, the release the sites' shared/fonts come from. Satori
@@ -11,6 +17,7 @@
 // SVG (@twemoji/svg 15.0.0, jdecked's Twemoji, graphics CC-BY 4.0), drawn as
 // an image in the line. They sit beside the fonts as emoji/.
 import { initWasm, Resvg } from '@resvg/resvg-wasm';
+import jpeg from 'jpeg-js';
 import satori from 'satori';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -85,14 +92,23 @@ export function prepare(dir) {
   return ready;
 }
 
-/** The PNG for an element tree. */
-export async function render(element, dir) {
+const QUALITY = 82;
+
+/** The image for an element tree: a PNG, or with format 'jpeg' a JPEG. */
+export async function render(element, dir, { format = 'png' } = {}) {
   const fonts = await prepare(dir);
   const svg = await satori(element, { width: WIDTH, height: HEIGHT, fonts, loadAdditionalAsset: emojiAsset(dir) });
   const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: WIDTH }, font: { loadSystemFonts: false } });
   const image = resvg.render();
-  const png = image.asPng();
-  image.free();
-  resvg.free();
-  return Buffer.from(png);
+  try {
+    if (format === 'jpeg') {
+      // The card is opaque, so the alpha jpeg-js drops was always 255.
+      const { data } = jpeg.encode({ data: image.pixels, width: image.width, height: image.height }, QUALITY);
+      return Buffer.from(data);
+    }
+    return Buffer.from(image.asPng());
+  } finally {
+    image.free();
+    resvg.free();
+  }
 }

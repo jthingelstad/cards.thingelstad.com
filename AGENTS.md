@@ -69,7 +69,13 @@ card.
   redirect only within the host it started on (a post that redirects off its
   site has no card), and reads no page past 2 MB or photo past 10 MB.
 - `src/card.mjs` is the layout, as the element tree Satori draws.
-- `src/render.mjs` draws it: Satori to SVG, resvg (WebAssembly) to PNG, with
+- `src/render.mjs` draws it: Satori to SVG, resvg (WebAssembly) to pixels,
+  then a JPEG for a card with a photo and a PNG for the rest (2026-10-25). A
+  photo card as PNG ran 0.6 to 1.5 MB, past Bluesky's 1,000,000-byte limit
+  for a link card's image; as a JPEG (`jpeg-js`, quality 82, no chroma
+  subsampling) it is 140 to 250 KB. Type on flat colour stays PNG, about 50
+  KB. Both are served at the `.png` path with their own `content-type`; no
+  site declares `og:image:type`, so none has to change. Fonts are
   static Inter and Inter Tight WOFF from Fontsource 5.3.0 (Satori reads no WOFF2
   or variable fonts). Emoji are Twemoji SVGs (`@twemoji/svg` 15.0.0, graphics
   CC-BY 4.0) drawn as images in the line; one newer than that set draws as
@@ -88,15 +94,18 @@ card.
   couldn't be had just now (unreachable, slow, a 5xx or 429) is kept five
   minutes, so it gets drawn again with it; a photo that is gone or not
   drawable is simply left out. A missing post is a 404 kept five minutes.
-  One JSON log line a request, never a post's words: `v`, `photo` (`drawn`,
-  `none`, `skipped`, `failed`), `photoMs` and `drawMs` on a drawn card.
+  One JSON log line a request, never a post's words: `v`, `format`, `photo`
+  (`drawn`, `none`, `skipped`, `failed`), `photoMs` and `drawMs` on a drawn
+  card.
 
 ## Working on it
 
 - `npm test` — paths, h-entry reading, excerpts, a PNG of every card kind,
+  a JPEG of a photo card under 1 MB,
   and (with fetch stubbed) the `v` check, redirects, size limits and photo
   failures.
-- `npm run render -- <post URL>...` — draw real posts into `.build/preview/`.
+- `npm run render -- <post URL>...` — draw real posts into `.build/preview/`
+  (`.jpg` for a card with a photo).
   Look at the cards before shipping a layout change.
 - `npm run plan` / `npm run deploy` — the `cards` stack (`infra/cards.json`),
   as the cloud-engineer identity from this Mac (the script refuses any other).
