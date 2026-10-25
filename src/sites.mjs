@@ -6,8 +6,9 @@
 // its label (its strip_label in the sites strip) and the host the band
 // shows; the owner's name opens the band. Here:
 //
-//   mark       the label's colour, the site's sites-strip mark
-//              (thingelstad.com AGENTS.md, "The sites strip"); none is ink
+//   mark       the label's colour in the card's dark band, the site's
+//              dark-mode sites-strip mark (thingelstad.com AGENTS.md, "The
+//              sites strip"); none is the strip's light ink
 //   layout     the card.mjs layout that draws its pages
 //   page(rest) the page a card path names, rest being the path between
 //              /<id>/ and .png: { path, kicker?, home? }, or null when that
@@ -76,7 +77,7 @@ const ENTRIES = {
   // line breaks), u-featured (the newest cover), p-issue-count and
   // p-link-count. Every page there but an issue or a topic shares that card.
   weekly: {
-    mark: '#1a5eb6',
+    mark: '#78acf2',
     layout: 'issue',
     page(rest) {
       if (rest === 'index') return { path: '/', home: true };
@@ -111,7 +112,7 @@ const ENTRIES = {
   // (p-duration, seconds; both 0 when the page lacks them). No photo: the
   // show's art is its own.
   another: {
-    mark: '#b3123f',
+    mark: '#f58aa3',
     layout: 'episode',
     page: dated,
     read: (p) => ({ text: summaryOr(p), photo: null, episode: { number: count(p.episode), seconds: count(p.duration) } }),

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cardFor, clip, durationLabel, excerpt, fitSize, formatDate, HEIGHT, OVERLAY, overPhoto, WIDTH } from '../src/card.mjs';
+import { breakLines, cardFor, clip, countParts, durationLabel, excerpt, fitSize, formatDate, HEIGHT, lede, OVERLAY, overPhoto, WIDTH } from '../src/card.mjs';
 import jpeg from 'jpeg-js';
 import { dimensions } from '../src/post.mjs';
 import { SITES } from '../src/sites.mjs';
@@ -25,6 +25,10 @@ test('a title shrinks until its longest word fits a line', () => {
   assert.equal(fitSize(100, 'Supercalifragilisticexpialidocious', 1072, 0.64), 49);
   assert.equal(fitSize(72, 'https://example.com/a/very/long/address/that/never/breaks', 472, 0.64), 28);
 });
+
+// Every string a card draws, in order.
+const texts = (node) =>
+  typeof node === 'string' ? [node] : Array.isArray(node) ? node.flatMap(texts) : node?.props ? texts(node.props.children) : [];
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 // A 1 x 1 PNG, standing in for a cover.
@@ -94,9 +98,12 @@ test('every kind of card draws a 1200 x 630 PNG', async () => {
 test('an issue card names the issue before the date, and its site in its colour', () => {
   const post = { title: 'Release Notes for Every Day', text: '', published: '2026-10-10T12:00:00Z', categories: [], photo: null };
   const words = JSON.stringify(cardFor(post, { site: SITES.weekly, photo: null, kicker: 'WT353' }));
-  assert.match(words, /WT353 · October 10, 2026/);
-  assert.match(words, /"color":"#1a5eb6"},"children":"Newsletter"/);
-  assert.match(JSON.stringify(cardFor(post, { site: SITES.www, photo: null })), /"color":"#16161a"},"children":"Blog"/);
+  assert.match(words, /"children":"WT353 · OCTOBER 10, 2026"/);
+  // The band is dark on every card: the site's dark-mode strip colour, or the
+  // strip's light ink for a site with none.
+  assert.match(words, /"color":"#78acf2"},"children":"Newsletter"/);
+  assert.match(words, /"backgroundColor":"#0e0e12"/);
+  assert.match(JSON.stringify(cardFor(post, { site: SITES.www, photo: null })), /"color":"#ececf0"},"children":"Blog"/);
   const dated = { ...post, title: 'May 5, 2018', published: '2018-05-05T12:00:00Z' };
   assert.match(JSON.stringify(cardFor(dated, { site: SITES.weekly, photo: null, kicker: 'WT52' })), /"children":"WT52"/);
 });
@@ -114,15 +121,17 @@ test('an issue with a cover sets its words over it, with its counts', async () =
   const tree = cardFor(post, { site: SITES.weekly, photo: { src: DOT }, kicker: 'WT353' });
   const words = JSON.stringify(tree);
   assert.match(words, /"position":"absolute"/);
-  assert.match(words, /19 links · 4 journal entries/);
+  assert.ok(texts(tree).join(' ').includes('19 links 4 journal entries'));
   assert.match(words, /Your Version Number Release Notes/);
+  // The photo is darkened from the left too, behind the words.
+  assert.match(words, /linear-gradient\(90deg, rgba\(10,10,14,0\.5\) 0%/);
   const png = await render(tree, dir);
   assert.equal(png.readUInt32BE(16), WIDTH);
   assert.equal(png.readUInt32BE(20), HEIGHT);
   // One of each says so; none is left out. With no cover, the counts go under the words.
-  const one = JSON.stringify(cardFor({ ...post, counts: { links: 1, journal: 0 } }, { site: SITES.weekly, photo: null, kicker: 'WT353' }));
-  assert.match(one, /"children":"1 link"/);
-  assert.doesNotMatch(one, /journal/);
+  const one = texts(cardFor({ ...post, counts: { links: 1, journal: 0 } }, { site: SITES.weekly, photo: null, kicker: 'WT353' }));
+  assert.ok(one.join(' ').includes('1 link'));
+  assert.ok(!one.some((said) => said.includes('journal')));
 });
 
 test('an issue with no cover is drawn on the newsletter blue under its W', () => {
@@ -130,21 +139,22 @@ test('an issue with no cover is drawn on the newsletter blue under its W', () =>
   const words = JSON.stringify(cardFor(post, { site: SITES.weekly, photo: null, kicker: 'WT1' }));
   assert.match(words, /linear-gradient\(135deg, #1f6fd6/);
   assert.match(words, /data:image\/svg\+xml;base64,/);
-  assert.match(words, /"children":"WT1 · May 13, 2017"/);
-  assert.match(words, /"children":"17 links"/);
+  assert.match(words, /"children":"WT1 · MAY 13, 2017"/);
+  assert.match(words, /"children":"17"/);
 });
 
-test('an episode reads as the show: its number, date, running time and a listen button', () => {
+test('an episode reads as the show: its number and date, and its crimson dot a play button with its running time', () => {
   const post = { title: 'How do you start a podcast?', text: 'Stepping into podcasting.', published: '2025-10-05T12:00:00Z', categories: [], episode: { number: 1, seconds: 635 } };
   const words = JSON.stringify(cardFor(post, { site: SITES.another, photo: null }));
   assert.match(words, /"children":"EPISODE 1 · OCTOBER 5, 2025"/);
   assert.match(words, /"children":"Another Thing"/);
-  assert.match(words, /"children":"Listen · 11 min"/);
-  assert.match(words, /"color":"#b3123f"},"children":"Podcast"/);
+  assert.match(words, /"children":"LISTEN · 11 MIN"/);
+  assert.match(words, /"width":132,"height":132,"borderRadius":66,"backgroundColor":"#c8174a"/);
+  assert.match(words, /"color":"#f58aa3"},"children":"Podcast"/);
   // A page that doesn't say its number or length still gets the card.
   const bare = JSON.stringify(cardFor({ ...post, episode: { number: 0, seconds: 0 } }, { site: SITES.another, photo: null }));
   assert.match(bare, /"children":"OCTOBER 5, 2025"/);
-  assert.match(bare, /"children":"Listen"/);
+  assert.match(bare, /"children":"LISTEN"/);
 });
 
 test('a running time reads as the episode page says it', () => {
@@ -226,20 +236,21 @@ test('over its photo, a micropost is its own headline and a titled post keeps it
   const base = { published: '2026-10-24T12:00:00Z', categories: ['Photos'] };
   const micro = JSON.stringify(cardFor({ ...base, title: '', text: 'Red leaves today.' }, { site: SITES.www, photo: WIDE }));
   assert.match(micro, /"position":"absolute"/);
-  assert.match(micro, /"fontFamily":"Inter Tight","fontWeight":800,"fontSize":88[^}]*"lineClamp":3},"children":"Red leaves today\."/);
-  assert.match(micro, /"children":"October 24, 2026 · Photos"/);
+  assert.match(micro, /"fontFamily":"Inter Tight","fontWeight":800[^}]*"fontSize":88[^}]*},"children":"Red leaves today\."/);
+  assert.match(micro, /"children":"OCTOBER 24, 2026 · PHOTOS"/);
   assert.match(micro, /rgba\(10,10,14,0\.72\) 0%/);
   const titled = JSON.stringify(
     cardFor({ ...base, title: 'Art Shanty Projects', text: 'We walked the lake. '.repeat(20) }, { site: SITES.www, photo: WIDE }),
   );
-  assert.match(titled, /"lineClamp":2},"children":"Art Shanty Projects"/);
+  assert.match(titled, /"children":"Art Shanty Projects"/);
   assert.match(titled, /"children":"We walked the lake\./);
-  // Beside a square photo, as before: no layer over it.
+  // A square photo stands full height on the right half, on black: no layer over it.
   const square = JSON.stringify(cardFor({ ...base, title: '', text: 'Red leaves today.' }, { site: SITES.www, photo: { ...WIDE, height: 1200 } }));
-  assert.doesNotMatch(square, /"position":"absolute"/);
+  assert.match(square, /"position":"absolute","top":0,"left":600,"width":600,"height":630/);
+  assert.doesNotMatch(square, /rgba\(10,10,14/);
   // A longer micropost, when the limit lets one in, steps down to fit.
   const long = JSON.stringify(cardFor({ ...base, title: '', text: 'word '.repeat(28).trim() }, { site: SITES.www, photo: WIDE, overlay: { words: 150 } }));
-  assert.match(long, /"fontSize":48[^}]*"lineClamp":4/);
+  assert.match(long, /"fontSize":48/);
 });
 
 const emoji = (...points) => String.fromCodePoint(...points);
@@ -256,18 +267,67 @@ test('an emoji finds its Twemoji file', async () => {
 });
 
 test('a link card reads as its record: the day saved, its issues, host, title and note', () => {
-  const words = JSON.stringify(cardFor(LINK, { site: SITES.links, photo: null }));
-  for (const said of ['Saved October 8, 2026', 'In WT353', 'techmatt.github.io', LINK.title, LINK.text])
-    assert.ok(words.includes(`"children":"${said}"`), said);
-  assert.match(words, /"color":"#0000ee","textDecoration":"underline"/);
-  assert.match(words, /"color":"#16161a"},"children":"Links"/);
+  const tree = cardFor(LINK, { site: SITES.links, photo: null });
+  const words = JSON.stringify(tree);
+  const said = texts(tree).join(' ');
+  for (const part of ['SAVED OCTOBER 8, 2026', 'In WT353', 'techmatt.github.io', LINK.title, LINK.text, 'JAMIE’S NOTE']) assert.ok(said.includes(part), part);
+  // On black, each line of the title underlined in the dark-mode link blue.
+  assert.match(words, /"backgroundColor":"#121218"/);
+  assert.match(words, /"borderBottom":"4px solid #78acf2"/);
+  assert.match(words, /"color":"#ececf0"},"children":"Links"/);
+  // More issues than two: the first two, then how many more.
+  const many = texts(cardFor({ ...LINK, issues: ['WT1', 'WT2', 'WT3', 'WT4'] }, { site: SITES.links, photo: null }));
+  assert.deepEqual(many.filter((t) => /^In WT|^\+/.test(t)), ['In WT1', 'In WT2', '+2']);
 });
 
 test('a title too long for its lines is cut at a word, never clamped', () => {
   assert.equal(clip('Short title', 20), 'Short title');
   assert.equal(clip('Vision Pro is an over-engineered devkit // Hardware bleeds genius', 45), 'Vision Pro is an over-engineered devkit…');
   const long = 'Dumb refrigerator, meet Smarter FridgeCam '.repeat(6);
-  const words = JSON.stringify(cardFor({ ...LINK, title: long, text: '' }, { site: SITES.links, photo: null }));
-  const title = JSON.parse(words).props.children[0].props.children[1].props.children[1].props.children;
-  assert.ok(title.endsWith('…') && title.length < long.length, title);
+  const said = texts(cardFor({ ...LINK, title: long, text: '' }, { site: SITES.links, photo: null }));
+  const end = said.findIndex((t) => t.endsWith('…'));
+  const start = said.findIndex((t) => long.startsWith(t));
+  const title = said.slice(start, end + 1).join(' ');
+  assert.ok(end >= 0 && title.length < long.length, title);
+});
+
+test('a headline is broken into even lines, or left to Satori when it cannot be', () => {
+  // 14 characters a line at 0.55em: the fewest lines, the widest as short as it can be.
+  assert.deepEqual(breakLines('Worked with Claude today', { size: 100, width: 800, most: 3 }), ['Worked with', 'Claude today']);
+  assert.deepEqual(breakLines('Red leaves.', { size: 100, width: 800, most: 3 }), ['Red leaves.']);
+  // No word alone on the last line.
+  assert.deepEqual(breakLines('How do you start a podcast?', { size: 100, width: 1100, most: 2 }), ['How do you', 'start a podcast?']);
+  // More lines than allowed, or a word wider than a line: null.
+  assert.equal(breakLines('one two three four five six seven', { size: 100, width: 400, most: 2 }), null);
+  assert.equal(breakLines('Incomprehensibilities', { size: 100, width: 800, most: 3 }), null);
+});
+
+test('a micropost leads with its first sentence only when that sentence is short', () => {
+  const rest = 'I publish links every week in the Weekly Thing but never had a site for all of them.';
+  assert.deepEqual(lede(`Worked with Claude today and created Linking Things! ${rest}`), { first: 'Worked with Claude today and created Linking Things!', rest });
+  // Short enough to be a headline whole; a first sentence too long, or too
+  // short to stand alone; one sentence only.
+  assert.equal(lede('Red leaves today.'), null);
+  assert.equal(lede(`${'A very long first sentence that keeps going and going '.repeat(2)}. ${rest}`), null);
+  assert.equal(lede(`Wow. ${rest}`), null);
+  assert.equal(lede('word '.repeat(30)), null);
+  const ink = cardFor({ title: '', text: `Worked with Claude today and created Linking Things! ${rest}`, published: '2026-10-23T12:00:00Z', categories: [] }, { site: SITES.www, photo: null });
+  assert.ok(texts(ink).includes(rest));
+  assert.match(JSON.stringify(ink), /"backgroundColor":"#16161a"/);
+});
+
+test('an issue counts what it has, one or many', () => {
+  assert.deepEqual(countParts({ links: 19, journal: 4 }), [[19, 'links'], [4, 'journal entries']]);
+  assert.deepEqual(countParts({ links: 1, journal: 1 }), [[1, 'link'], [1, 'journal entry']]);
+  assert.deepEqual(countParts({ links: 0, journal: 0 }), []);
+  assert.deepEqual(countParts(undefined), []);
+});
+
+test('a screenshot runs off the corner of the card, framed, beside the words', () => {
+  const post = { title: 'Phishing Fear', text: 'Well done phishing campaign.', published: '2026-10-24T12:00:00Z', categories: [] };
+  const words = JSON.stringify(cardFor(post, { site: SITES.www, photo: { src: DOT, width: 1400, height: 1000, screenshot: true } }));
+  assert.match(words, /"top":64,"left":590,"width":700,"height":500/);
+  assert.match(words, /"borderRadius":16/);
+  // A screenshot of unknown size fills the height above the band.
+  assert.match(JSON.stringify(cardFor(post, { site: SITES.www, photo: { src: DOT, screenshot: true } })), /"width":700,"height":562/);
 });
