@@ -10,7 +10,7 @@
   },
   "scripts": {
     "test": "npm run sites:check && npm run test:unit",
-    "test:unit": "node --test test/",
+    "test:unit": "node --test test/*.test.mjs",
     "sites:sync": "node scripts/sync-sites.mjs",
     "sites:check": "node scripts/sync-sites.mjs --check",
     "package": "node tools/package.mjs",
