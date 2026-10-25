@@ -13,7 +13,7 @@
 //              /<id>/ and .png: { path, kicker?, home? }, or null when that
 //              is no card
 //   read(p)    the site's part of a card, from the page's h-entry
-//              properties: { text, photo, counts?, episode? }
+//              properties: { text, photo, counts?, episode?, host?, issues? }
 //   home(p)    the card of its front page, from the h-feed there
 //              (only a site whose page() names one)
 //   photo(src) where a photo its page names is fetched from, or null for
@@ -30,6 +30,8 @@ const COVER = /^https:\/\/files\.thingelstad\.com\/weekly-thing\/[A-Za-z0-9/_.-]
 
 const DATED = /^(\d{4}\/\d{2}\/\d{2}\/[A-Za-z0-9_-]+)$/;
 const ISSUE = /^archive\/(\d{1,4}(?:-[a-z]+)?)$/;
+// A saved link's id: the first 12 hex of the md5 of its URL as saved.
+const LINK = /^links\/[0-9a-f]{12}$/;
 
 /** A dated post's page: /2026/10/15/the-nnxyz-rooms.html. */
 const dated = (rest) => (DATED.test(rest) ? { path: `/${rest}.html` } : null);
@@ -113,6 +115,23 @@ const ENTRIES = {
     layout: 'episode',
     page: dated,
     read: (p) => ({ text: summaryOr(p), photo: null, episode: { number: count(p.episode), seconds: count(p.duration) } }),
+    photo: () => null,
+  },
+  // A saved link's record page (Linking Things): its title, the host it
+  // points at (p-host), the day saved, the issues that carried it (p-issue,
+  // "WT199"), and its note only when the note is Jamie's own words (p-voice
+  // "jamie"; Jamie, 2026-10-25: "Jamie-voice notes only"). A quotation from
+  // the page, a mixed note or an agent's summary is never on the card, nor a
+  // note on a page that doesn't say whose it is. No photo.
+  links: {
+    layout: 'link',
+    page: (rest) => (LINK.test(rest) ? { path: `/${rest}/` } : null),
+    read: (p) => ({
+      text: words(p.voice) === 'jamie' ? plainText(markup(p.content)) : '',
+      photo: null,
+      host: words(p.host),
+      issues: (p.issue ?? []).map((issue) => words([issue])).filter(Boolean),
+    }),
     photo: () => null,
   },
 };

@@ -6,6 +6,7 @@
 //   /weekly/archive/353.png                  https://weekly.thingelstad.com/archive/353/
 //   /another/2025/10/05/how-do-you-start-a.png  https://another.thingelstad.com/2025/10/05/how-do-you-start-a.html
 //   /weekly/index.png                        https://weekly.thingelstad.com/ (the newsletter's own card)
+//   /links/links/0a1b2c3d4e5f.png            https://links.thingelstad.xyz/links/0a1b2c3d4e5f/
 //
 // The page is fetched and read as an h-entry, the microformats every post,
 // issue and episode carries: p-name (titled posts only; a micropost has

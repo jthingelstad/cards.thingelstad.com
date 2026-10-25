@@ -26,6 +26,13 @@ test('a card path names a Weekly Thing issue or an Another Thing episode', () =>
   });
 });
 
+test('a card path names a saved link', () => {
+  assert.deepEqual(postFor('/links/links/dec34be50cef.png'), {
+    site: 'links',
+    url: 'https://links.thingelstad.xyz/links/dec34be50cef/',
+  });
+});
+
 test('anything else is not a card', () => {
   for (const path of [
     '/',
@@ -41,6 +48,11 @@ test('anything else is not a card', () => {
     '/weekly/topics/claude.png',
     '/another/archive/1.png',
     '/xyz/things/thingy.png',
+    '/links/index.png',
+    '/links/links/dec34be50ce.png',
+    '/links/links/DEC34BE50CEF.png',
+    '/links/links/dec34be50cef/index.png',
+    '/links/hosts/github.com.png',
   ])
     assert.equal(postFor(path), null, path);
 });
@@ -183,4 +195,37 @@ test('a blog post reads its own words, never a summary', () => {
     'https://www.thingelstad.com/2026/10/15/t.html',
   );
   assert.equal(post.text, 'The post.');
+});
+
+// A record page as Linking Things builds it (src/pages/links/[id].astro),
+// cut to its h-entry.
+const record = ({ voice, issues = ['WT353'], note = '<p>I \u{1f49b} the Mandelbrot fractal.</p>' } = {}) => `
+<article class="record h-entry">
+  <header class="record-hero">
+    <h1 class="record-title p-name"><a class="u-bookmark-of" href="https://www.techmatt.github.io/fractals/">Mandelnaut — Making Fractal Wallpapers <svg class="out" viewBox="0 0 12 12"><path d="M4 2h6v6"/></svg></a></h1>
+    <p class="record-url"><b>www.techmatt.github.io</b>/fractals</p>
+    <data class="p-host" value="techmatt.github.io"></data>
+    ${voice ? `<data class="p-voice" value="${voice}"></data>` : ''}
+    <div class="record-byline"><span>Saved <time class="dt-published" datetime="2026-10-09T01:29:08Z">Thursday, October 8, 2026</time></span>
+      ${issues.map((issue) => `<a class="chip" href="/issues/353/">In <span class="p-issue">${issue}</span></a>`).join('')}</div>
+  </header>
+  ${note ? `<div class="note e-content">${note}</div>` : ''}
+</article>`;
+const LINK = 'https://links.thingelstad.xyz/links/dec34be50cef/';
+
+test("a saved link reads its title, host, day and issues, and only Jamie's own note", () => {
+  const post = readPost(record({ voice: 'jamie', issues: ['WT353', 'Special'] }), LINK);
+  assert.equal(post.title, 'Mandelnaut — Making Fractal Wallpapers');
+  assert.equal(post.host, 'techmatt.github.io');
+  assert.equal(post.published, '2026-10-09T01:29:08Z');
+  assert.deepEqual(post.issues, ['WT353', 'Special']);
+  assert.equal(post.text, 'I \u{1f49b} the Mandelbrot fractal.');
+  assert.equal(post.photo, null);
+  // A quotation, a note around one, an agent's summary, or a note whose
+  // voice the page doesn't give: never on the card.
+  for (const voice of ['excerpt', 'mixed', 'agent', 'Jamie', undefined])
+    assert.equal(readPost(record({ voice }), LINK).text, '', String(voice));
+  const bare = readPost(record({ issues: [], note: '' }), LINK);
+  assert.equal(bare.text, '');
+  assert.deepEqual(bare.issues, []);
 });

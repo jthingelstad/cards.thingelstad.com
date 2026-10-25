@@ -29,6 +29,14 @@ card shows:
     https://cards.thingelstad.com/weekly/index.png?v=<hash>
     https://cards.thingelstad.com/another/2025/10/05/how-do-you-start-a.png?v=<hash>
 
+Linking Things records have cards too (2026-10-25; Jamie: "Linking Things
+link cards with Jamie-voice notes only"), set by the site's `src/lib/card.ts`:
+
+    https://cards.thingelstad.com/links/links/dec34be50cef.png?v=<hash>
+
+names https://links.thingelstad.xyz/links/dec34be50cef/. Every other page
+there keeps the site's one share image.
+
 Then richer (Jamie, 2026-10-25: "make it rich and inviting and equal to the
 quality of the thing it is previewing"): every Weekly Thing and Another Thing
 card is dark, its words in white, and only the blog keeps the black-and-white
@@ -55,6 +63,15 @@ card.
   button with its running time (`p-duration`, seconds, worded as the site's
   `friendlyDuration`: "11 min"). A page without them still gets the card,
   without those words. No photo: the show's art is its own.
+- **A saved link** is drawn on white, the way its record page reads: the day
+  saved (`dt-published`) and the issues that carried it (`p-issue`, as the
+  page's "In WT353" chips), then the host it points at (`p-host`), the title
+  (`p-name`) in the site's link blue, underlined, and the note (`e-content`)
+  only when the page's `p-voice` is `jamie`: a quotation from the page
+  (`excerpt`), a note around one (`mixed`), an agent's summary (`agent`) or a
+  note on a page that doesn't say whose it is never reaches the card. A
+  title too long for its lines is cut at a word before it is drawn, since a
+  line Satori clamps loses its underline. No photo.
 - The blog reads its own words, never a `p-summary`. The site's label in the
   band takes its sites-strip colour.
 
@@ -119,7 +136,8 @@ maker ships first, so the page never names a card it can't draw):
    the only photo host it may fetch (`() => null` for none). The site must be
    in `shared/sites.json` (`npm run sites:sync`); its origin and label come
    from there. Tests for its paths and its reading, and previews of real
-   pages (`npm run render`) looked at before it merges. Deploy.
+   pages (`npm run render -- --root=<its dist>`) looked at before it merges.
+   Deploy.
 2. **Its pages.** An h-entry with the fields its entry reads (the card reads
    nothing else), and in its `<head>`:
 
@@ -148,7 +166,9 @@ maker ships first, so the page never names a card it can't draw):
 - `npm run sites:sync` — copy the domain's `shared/sites.json` in, after it
   changes there.
 - `npm run render -- <post URL>...` — draw real posts into `.build/preview/`
-  (`.jpg` for a card with a photo).
+  (`.jpg` for a card with a photo). `--root=<dir>` reads the pages from a
+  site's local build (its `dist/`) instead of the live site, to see a page's
+  card before the page that names it ships.
   Look at the cards before shipping a layout change.
 - `npm run plan` / `npm run deploy` — the `cards` stack (`infra/cards.json`),
   as the cloud-engineer identity from this Mac (the script refuses any other).

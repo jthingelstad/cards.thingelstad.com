@@ -447,11 +447,115 @@ function postCard(post, { site, photo, meta }) {
   );
 }
 
+// Linking Things' blue, its links' colour on white, and the chip an issue
+// takes there (the newsletter's text blue on its soft tint).
+const LINK_BLUE = '#0000ee';
+const CHIP = { text: '#1a5eb6', fill: '#edf3fc' };
+
+// A saved link, the way its record page reads: the day saved and the issues
+// that carried it, then the host, the title in the site's link blue,
+// underlined, and Jamie's note when there is one (sites.mjs reads only Jamie's
+// own words). Type steps down for a long title and again beside a note.
+const linkTitleSize = (n, note) =>
+  note ? (n <= 26 ? 80 : n <= 50 ? 64 : n <= 90 ? 52 : 44) : n <= 26 ? 100 : n <= 50 ? 80 : n <= 90 ? 64 : 52;
+
+/** Up to limit characters, cut at a word: a title too long for its lines is
+ * cut here, since a line Satori clamps loses its underline. */
+export function clip(text, limit) {
+  if (text.length <= limit) return text;
+  const cut = text.slice(0, limit);
+  const space = cut.lastIndexOf(' ');
+  return `${cut.slice(0, space > limit * 0.6 ? space : limit).replace(/[\s,;:/|–—-]+$/, '')}…`;
+}
+
+function linkCard(post, { site }) {
+  const width = WIDTH - 2 * PAD;
+  const note = post.text ? excerpt(post.text, 200) : '';
+  const whole = post.title || post.host;
+  const lines = note ? 3 : 4;
+  const size = fitSize(linkTitleSize(whole.length, Boolean(note)), whole, width, 0.64);
+  // Inter Tight at 800 runs about 0.4em a character; 0.42 and the 0.88 leave
+  // room for the words that don't fill a line.
+  const title = clip(whole, Math.floor(((lines * width) / (0.42 * size)) * 0.88));
+  const chips = (post.issues ?? []).slice(0, 4).map((issue) =>
+    h(
+      'div',
+      {
+        display: 'block',
+        marginLeft: 14,
+        padding: '3px 12px',
+        borderRadius: 6,
+        backgroundColor: CHIP.fill,
+        color: CHIP.text,
+        fontSize: 20,
+        fontWeight: 600,
+        letterSpacing: '0.02em',
+      },
+      `In ${issue}`,
+    ),
+  );
+  const date = formatDate(post.published);
+  const top = h(
+    'div',
+    { display: 'flex', alignItems: 'center', fontSize: 22, fontWeight: 600, letterSpacing: '0.04em', color: MUTED },
+    h('div', { display: 'block' }, date ? `Saved ${date}` : ' '),
+    ...chips,
+  );
+  const words = tree('div', { display: 'flex', flexDirection: 'column', width }, [
+    post.host &&
+      h('div', { display: 'block', marginBottom: 18, fontSize: 28, fontWeight: 600, color: SOFT, lineClamp: 1 }, post.host),
+    h(
+      'div',
+      {
+        display: 'block',
+        fontFamily: 'Inter Tight',
+        fontWeight: 800,
+        fontSize: size,
+        lineHeight: 1.08,
+        letterSpacing: '-0.02em',
+        color: LINK_BLUE,
+        textDecoration: 'underline',
+        textDecorationColor: LINK_BLUE,
+        textDecorationThickness: Math.max(3, Math.round(size / 18)),
+        textDecorationSkipInk: 'auto',
+        lineClamp: lines,
+      },
+      title,
+    ),
+    note &&
+      h(
+        'div',
+        { display: 'block', marginTop: 28, fontSize: 28, lineHeight: 1.45, color: SOFT, maxWidth: 1000, lineClamp: 3 },
+        note,
+      ),
+  ]);
+  return h(
+    'div',
+    { display: 'flex', flexDirection: 'column', width: WIDTH, height: HEIGHT, backgroundColor: WHITE, fontFamily: 'Inter', color: INK },
+    h(
+      'div',
+      {
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        flexGrow: 1,
+        minHeight: 0,
+        boxSizing: 'border-box',
+        padding: `52px ${PAD}px 44px ${PAD}px`,
+      },
+      top,
+      words,
+    ),
+    band(site),
+  );
+}
+
 // The layouts a site's entry names (sites.mjs).
 const LAYOUTS = {
   post: postCard,
   issue: (post, { site, photo, meta }) => overCover(post, { site, photo, meta, counts: countsLine(post.counts) }),
   episode: episodeCard,
+  link: linkCard,
 };
 
 /** The element tree for a post's card. photo is fetchPhoto's result or null. */
