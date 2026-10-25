@@ -1,6 +1,9 @@
 // Draw cards on this Mac, the way the Lambda does, reading the live posts.
 //
-//   node tools/render.mjs <post URL or card path>... [--out=<dir>] [--root=<dir>]
+//   node tools/render.mjs <post URL or card path>... [--out=<dir>] [--root=<dir>] [--overlay=<json>]
+//
+// --overlay='{"wide":0.95,"words":150,"top":0.6}' draws the blog overlay with
+// other settings than OVERLAY in src/card.mjs, to compare them.
 //
 // Takes any page a site in sites.mjs has a card for. Writes <site>-<slug>.png
 // (or .jpg, for a card with a photo) for each to --out (default
@@ -10,7 +13,7 @@
 // /links/<id>/ is <root>/links/<id>/index.html.
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { cardFor } from '../src/card.mjs';
+import { cardFor, OVERLAY, overPhoto } from '../src/card.mjs';
 import { fetchPhoto, fetchPost, postFor, readPost } from '../src/post.mjs';
 import { render } from '../src/render.mjs';
 import { SITES, siteAt } from '../src/sites.mjs';
@@ -19,9 +22,10 @@ import { OUT, stageAssets } from './package.mjs';
 const args = process.argv.slice(2);
 const out = args.find((a) => a.startsWith('--out='))?.slice(6) ?? path.join(OUT, 'preview');
 const root = args.find((a) => a.startsWith('--root='))?.slice(7);
+const overlay = JSON.parse(args.find((a) => a.startsWith('--overlay='))?.slice(10) ?? '{}');
 const targets = args.filter((a) => !a.startsWith('--'));
 if (!targets.length) {
-  console.error('usage: node tools/render.mjs <post URL or card path>... [--out=<dir>] [--root=<dir>]');
+  console.error('usage: node tools/render.mjs <post URL or card path>... [--out=<dir>] [--root=<dir>] [--overlay=<json>]');
   process.exit(2);
 }
 
@@ -50,8 +54,9 @@ for (const target of targets) {
     return null;
   });
   const format = photo ? 'jpeg' : 'png';
-  const image = await render(cardFor(data, { site: SITES[post.site], photo, kicker: post.kicker }), dir, { format });
+  const image = await render(cardFor(data, { site: SITES[post.site], photo, kicker: post.kicker, overlay }), dir, { format });
   const file = path.join(out, `${post.site}-${path.basename(cardPath, '.png')}.${format === 'jpeg' ? 'jpg' : 'png'}`);
   await fs.writeFile(file, image);
-  console.log(`${file}  ${image.length} bytes  ${Date.now() - started} ms`);
+  const over = post.site === 'www' && overPhoto(data, photo, { ...OVERLAY, ...overlay }) ? '  over its photo' : '';
+  console.log(`${file}  ${image.length} bytes  ${Date.now() - started} ms${over}`);
 }
