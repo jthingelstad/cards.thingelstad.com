@@ -20,8 +20,9 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cardFor } from './card.mjs';
-import { fetchPhoto, fetchPost, namedVersion, postFor, SITES } from './post.mjs';
+import { fetchPhoto, fetchPost, namedVersion, postFor } from './post.mjs';
 import { prepare, render } from './render.mjs';
+import { SITES } from './sites.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const CODE = process.env.CARDS_CODE || 'local';
@@ -58,6 +59,7 @@ export async function handler(event) {
     };
   }
   const target = postFor(route);
+  const site = target && SITES[target.site];
   if (!target) {
     log(404);
     return text(404, 'Not a card', BRIEF);
@@ -91,7 +93,7 @@ export async function handler(event) {
     let photo = null;
     let state = post.photo ? 'drawn' : 'none';
     try {
-      photo = await fetchPhoto(post.photo);
+      photo = await fetchPhoto(post.photo, site);
       if (post.photo && !photo) state = 'skipped';
     } catch {
       state = 'failed';
@@ -100,7 +102,7 @@ export async function handler(event) {
     // A card with a photo is a JPEG, kept under Bluesky's 1 MB; one of type
     // and colour stays PNG. Either is served at its .png path.
     const format = photo ? 'jpeg' : 'png';
-    const image = await render(cardFor(post, { site: SITES[target.site], photo, kicker: target.kicker }), DIR, { format });
+    const image = await render(cardFor(post, { site, photo, kicker: target.kicker }), DIR, { format });
     log(200, {
       site: target.site,
       v,

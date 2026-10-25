@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { firstPhoto, headlineLines, plainText, postFor, readPost } from '../src/post.mjs';
+import { postFor, readPost } from '../src/post.mjs';
+import { headlineLines, plainText } from '../src/read.mjs';
+import { firstPhoto } from '../src/sites.mjs';
 
 test('a card path names a blog post', () => {
   assert.deepEqual(postFor('/www/2026/10/15/the-nnxyz-rooms.png'), {

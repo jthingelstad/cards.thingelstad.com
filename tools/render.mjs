@@ -8,8 +8,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { cardFor } from '../src/card.mjs';
-import { fetchPhoto, fetchPost, postFor, SITES } from '../src/post.mjs';
+import { fetchPhoto, fetchPost, postFor } from '../src/post.mjs';
 import { render } from '../src/render.mjs';
+import { SITES, siteAt } from '../src/sites.mjs';
 import { OUT, stageAssets } from './package.mjs';
 
 const args = process.argv.slice(2);
@@ -22,8 +23,8 @@ if (!targets.length) {
 
 // A page's address as its card path: /www/..., /weekly/archive/<n>, /another/...
 function pathFor(url) {
-  const { origin, pathname } = new URL(url);
-  const site = Object.keys(SITES).find((id) => SITES[id].origin === origin);
+  const { pathname } = new URL(url);
+  const site = siteAt(url)?.id;
   if (!site) return url;
   // The newsletter's front page is its own card, /weekly/index.png.
   if (pathname === '/') return `/${site}/index.png`;
@@ -39,7 +40,7 @@ for (const target of targets) {
   const started = Date.now();
   const data = await fetchPost(post.url, post);
   if (!data) throw new Error(`${post.url}: no such post`);
-  const photo = await fetchPhoto(data.photo).catch((error) => {
+  const photo = await fetchPhoto(data.photo, SITES[post.site]).catch((error) => {
     console.warn(`${target}: drawn without its photo (${error.message})`);
     return null;
   });
