@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { handler } from '../src/handler.mjs';
 import { fetchPhoto, fetchPost, get, namedCard, namedVersion, readPost } from '../src/post.mjs';
+import { SITES } from '../src/sites.mjs';
 
 // Every fetch here is answered by the table; nothing reaches the network.
 const real = globalThis.fetch;
@@ -104,20 +105,30 @@ const jpeg = () => new Response(new Uint8Array([0xff, 0xd8, 0xff]), { headers: {
 
 test('a photo that is gone or not drawable is none; one not had just now is a failure', async () => {
   serve({ [RESIZED]: jpeg });
-  assert.match((await fetchPhoto(UPLOAD)).src, /^data:image\/jpeg;base64,/);
+  assert.match((await fetchPhoto(UPLOAD, SITES.www)).src, /^data:image\/jpeg;base64,/);
   serve({ [RESIZED]: () => new Response('gone', { status: 404 }) });
-  assert.equal(await fetchPhoto(UPLOAD), null);
+  assert.equal(await fetchPhoto(UPLOAD, SITES.www), null);
   serve({ [RESIZED]: () => new Response('<html>', { headers: { 'content-type': 'text/html' } }) });
-  assert.equal(await fetchPhoto(UPLOAD), null);
+  assert.equal(await fetchPhoto(UPLOAD, SITES.www), null);
   serve({ [RESIZED]: moved('https://elsewhere.example/leaves.jpg') });
-  assert.equal(await fetchPhoto(UPLOAD), null);
+  assert.equal(await fetchPhoto(UPLOAD, SITES.www), null);
   serve({ [RESIZED]: () => new Response('busy', { status: 503 }) });
-  await assert.rejects(fetchPhoto(UPLOAD), /HTTP 503/);
+  await assert.rejects(fetchPhoto(UPLOAD, SITES.www), /HTTP 503/);
   serve({ [RESIZED]: () => new Response('slow down', { status: 429 }) });
-  await assert.rejects(fetchPhoto(UPLOAD), /HTTP 429/);
+  await assert.rejects(fetchPhoto(UPLOAD, SITES.www), /HTTP 429/);
   serve({ [RESIZED]: new TypeError('fetch failed') });
-  await assert.rejects(fetchPhoto(UPLOAD), /fetch failed/);
-  assert.equal(await fetchPhoto('https://example.com/a.jpg'), null);
+  await assert.rejects(fetchPhoto(UPLOAD, SITES.www), /fetch failed/);
+  assert.equal(await fetchPhoto('https://example.com/a.jpg', SITES.www), null);
+});
+
+test('a site fetches only the photos its entry names', async () => {
+  // Nothing is served: a fetch here would fail the test.
+  serve({});
+  const cover = 'https://files.thingelstad.com/weekly-thing/353/cover.jpg';
+  assert.equal(await fetchPhoto(cover, SITES.www), null);
+  assert.equal(await fetchPhoto(UPLOAD, SITES.weekly), null);
+  assert.equal(await fetchPhoto(UPLOAD, SITES.another), null);
+  assert.equal(await fetchPhoto(null, SITES.www), null);
 });
 
 const request = (rawPath, rawQueryString = '') => ({

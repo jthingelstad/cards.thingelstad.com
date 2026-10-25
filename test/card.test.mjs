@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cardFor, durationLabel, excerpt, fitSize, formatDate, HEIGHT, WIDTH } from '../src/card.mjs';
 import jpeg from 'jpeg-js';
-import { dimensions, SITES } from '../src/post.mjs';
+import { dimensions } from '../src/post.mjs';
+import { SITES } from '../src/sites.mjs';
 import { emojiAsset, emojiFiles, render } from '../src/render.mjs';
 import { stageAssets } from '../tools/package.mjs';
 

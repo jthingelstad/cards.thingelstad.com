@@ -21,7 +21,7 @@ last-edit date), so an edited post gets a new card.
 
 Weekly Thing issues and Another Thing episodes have cards too (2026-10-25;
 Jamie: "Weekly Thing and Another Thing issues should get custom share images
-with cards.thingelstad.com solution"). `SITES` in `src/post.mjs` is the list,
+with cards.thingelstad.com solution"). `SITES` in `src/sites.mjs` is the list,
 and each site's own `base.njk` sets `og:image`, with `v` a hash of what the
 card shows:
 
@@ -60,15 +60,24 @@ card.
 
 ## How it works
 
-- `src/post.mjs` fetches the post and reads its h-entry (p-name, e-content,
-  dt-published, p-category, and for issues p-summary, u-featured and the
-  counts; for episodes the number and running time), or the front page's
-  h-feed, and its photo: a blog post's first upload, through micro.blog's
-  resizer, or an issue's cover straight from `files.thingelstad.com`. It
-  fetches nothing but the three sites and those photo hosts, follows a
-  redirect only within the host it started on (a post that redirects off its
-  site has no card), and reads no page past 2 MB or photo past 10 MB.
-- `src/card.mjs` is the layout, as the element tree Satori draws.
+- `src/sites.mjs` holds one entry a site, and everything that differs
+  between the sites is there (2026-10-25): which card paths name which pages,
+  what its h-entry gives the card (the blog's own words and first upload; an
+  issue's dek, cover and counts; an episode's number and running time), its
+  front page's h-feed where it has one, the layout that draws it, its mark,
+  and where its photos are fetched from. The origin, the label and the host
+  come from `src/shared/sites.json`, the vendored copy of the domain's
+  `shared/sites.json`, and the band's name from its owner.
+- `src/post.mjs` maps a card path to its page, fetches the page and reads its
+  h-entry (p-name, dt-published, p-category, then the site's entry for the
+  rest), and fetches its photo where the site's entry says (a blog upload
+  through micro.blog's resizer, an issue's cover straight from
+  `files.thingelstad.com`). It fetches nothing but the sites' pages and those
+  photo hosts, follows a redirect only within the host it started on (a post
+  that redirects off its site has no card), and reads no page past 2 MB or
+  photo past 10 MB. `src/read.mjs` has the reading helpers every site shares.
+- `src/card.mjs` is the layouts, as the element trees Satori draws: `post`
+  (the blog), `issue`, `episode`, and the newsletter's front page.
 - `src/render.mjs` draws it: Satori to SVG, resvg (WebAssembly) to pixels,
   then a JPEG for a card with a photo and a PNG for the rest (2026-10-25). A
   photo card as PNG ran 0.6 to 1.5 MB, past Bluesky's 1,000,000-byte limit
@@ -98,12 +107,46 @@ card.
   (`drawn`, `none`, `skipped`, `failed`), `photoMs` and `drawMs` on a drawn
   card.
 
+## Adding a site
+
+A site joins in two places, its own pages and here, in this order (the card
+maker ships first, so the page never names a card it can't draw):
+
+1. **Here.** Its entry in `src/sites.mjs`: `page(rest)` for the paths its
+   cards take (`/<id>` then the page's own path, `.png` for its trailing
+   `.html` or `/`), `read(p)` for what its h-entry gives the card, a `layout`
+   (one in `src/card.mjs`, or a new one), its `mark`, and `photo(src)` naming
+   the only photo host it may fetch (`() => null` for none). The site must be
+   in `shared/sites.json` (`npm run sites:sync`); its origin and label come
+   from there. Tests for its paths and its reading, and previews of real
+   pages (`npm run render`) looked at before it merges. Deploy.
+2. **Its pages.** An h-entry with the fields its entry reads (the card reads
+   nothing else), and in its `<head>`:
+
+       <meta property="og:image" content="https://cards.thingelstad.com/<id>/<path>.png?v=<v>">
+       <meta property="og:image:width" content="1200">
+       <meta property="og:image:height" content="630">
+       <meta property="og:image:alt" content="<what the card says>">
+       <meta name="twitter:card" content="summary_large_image">
+
+   `v` is a hash of everything the card shows, so a page that changes gets a
+   new card: Weekly Thing and Another Thing take the first 10 hex characters
+   of the SHA-256 of a JSON array of those fields (the blog's theme an MD5,
+   which is all Hugo has). The card maker draws only at the `v` the page
+   names, so the page is the only place it is computed. No `og:image:type`:
+   a card is PNG or JPEG at its `.png` path.
+
 ## Working on it
 
-- `npm test` — paths, h-entry reading, excerpts, a PNG of every card kind,
-  a JPEG of a photo card under 1 MB,
-  and (with fetch stubbed) the `v` check, redirects, size limits and photo
-  failures.
+- `npm test` — `sites:check` (the vendored `sites.json` matches the domain's;
+  from a worktree outside `~/Projects/thingelstad.com/`, set `SITES_SOURCE` to
+  that file), then `test:unit`: paths, each site's entry, h-entry reading,
+  excerpts, a PNG of every card kind, a JPEG of a photo card under 1 MB, and
+  (with fetch stubbed) the `v` check, redirects, size limits and photos.
+  GitHub Actions runs `test:unit` on every pull request and on main; it
+  checks out only this repo, so the drift check stays local.
+- `npm run sites:sync` — copy the domain's `shared/sites.json` in, after it
+  changes there.
 - `npm run render -- <post URL>...` — draw real posts into `.build/preview/`
   (`.jpg` for a card with a photo).
   Look at the cards before shipping a layout change.

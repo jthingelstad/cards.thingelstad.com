@@ -130,7 +130,7 @@ export function durationLabel(seconds) {
 
 const number = (n) => new Intl.NumberFormat('en-US').format(n);
 
-// Jamie Thingelstad, the site's label and its host, in the strip's grey.
+// The owner's name, the site's label and its host, in the strip's grey.
 const band = (site) =>
   h(
     'div',
@@ -143,7 +143,7 @@ const band = (site) =>
       backgroundColor: STRIP,
       fontSize: 22,
     },
-    h('div', { display: 'block', color: MUTED }, 'Jamie Thingelstad'),
+    h('div', { display: 'block', color: MUTED }, site.owner),
     h('div', { display: 'block', marginLeft: 28, fontWeight: 600, color: site.mark ?? INK }, site.label),
     h('div', { display: 'block', marginLeft: 'auto', fontWeight: 500, color: MUTED }, site.host),
   );
@@ -322,15 +322,8 @@ function episodeCard(post, { site }) {
   );
 }
 
-/** The element tree for a post's card. photo is fetchPhoto's result or null. */
-export function cardFor(post, { site, photo, kicker }) {
-  // An early issue titled only with its date ("May 5, 2018") isn't dated twice.
-  const date = formatDate(post.published);
-  const meta = [kicker, date === post.title ? '' : date, ...post.categories.slice(0, 3)].filter(Boolean).join(' · ');
-  if (post.home) return homeCard(post, { site, photo });
-  if (post.episode) return episodeCard(post, { site });
-  const counts = countsLine(post.counts);
-  if (post.counts) return overCover(post, { site, photo, meta, counts });
+// A blog post: its words, and its photo on the right half when it has one.
+function postCard(post, { site, photo, meta }) {
   const hasPhoto = Boolean(photo);
   const width = column(hasPhoto) - 2 * PAD;
   const words = [];
@@ -370,8 +363,6 @@ export function cardFor(post, { site, photo, kicker }) {
           excerpt(post.text, 220),
         ),
       );
-    if (!hasPhoto && counts)
-      words.push(h('div', { display: 'block', marginTop: 18, fontSize: 22, fontWeight: 600, color: MUTED }, counts));
   } else if (post.text) {
     const text = excerpt(post.text, hasPhoto ? 200 : 260);
     const { lines, ...style } = noteStyle(text.length, hasPhoto);
@@ -454,4 +445,22 @@ export function cardFor(post, { site, photo, kicker }) {
     h('div', { display: 'flex', flexGrow: 1, minHeight: 0 }, ...main),
     band(site),
   );
+}
+
+// The layouts a site's entry names (sites.mjs).
+const LAYOUTS = {
+  post: postCard,
+  issue: (post, { site, photo, meta }) => overCover(post, { site, photo, meta, counts: countsLine(post.counts) }),
+  episode: episodeCard,
+};
+
+/** The element tree for a post's card. photo is fetchPhoto's result or null. */
+export function cardFor(post, { site, photo, kicker }) {
+  if (post.home) return homeCard(post, { site, photo });
+  const layout = LAYOUTS[site.layout];
+  if (!layout) throw new Error(`${site.id} names no layout here (${site.layout})`);
+  // An early issue titled only with its date ("May 5, 2018") isn't dated twice.
+  const date = formatDate(post.published);
+  const meta = [kicker, date === post.title ? '' : date, ...post.categories.slice(0, 3)].filter(Boolean).join(' · ');
+  return layout(post, { site, photo, meta });
 }
