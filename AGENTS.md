@@ -82,7 +82,10 @@ card.
   title's text under it. Any other photo post keeps the split card, the photo
   on the right half. `overPhoto` in `src/card.mjs` is that rule; `OVERLAY`
   holds its three settings (`wide`, `words`, and `top`, how dark the top of
-  the photo is, which issue covers share), each one Jamie's call.
+  the photo is, which issue covers share), each one Jamie's call. Jamie
+  chose 1.3, 80 and 0.72 on 2026-10-25 ("with the defaults: no square
+  photos, 80 characters, darker top 0.72"), after previews showed a square
+  photo losing its subject to the crop and 150 characters covering it.
 
 ## How it works
 
