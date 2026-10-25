@@ -7,14 +7,19 @@
 //   GET /another/<yyyy>/<mm>/<dd>/<slug>.png  ... that Another Thing episode
 //   GET /health                            the package this function runs
 //
-// A card is drawn once and kept: CloudFront holds it for a year, keyed on
-// the path and ?v=, which each site sets from a hash of the post's words so
-// an edited post gets a new card. A post that doesn't exist is a 404, kept
-// for five minutes. One log line a request, never a post's words.
+// A card is drawn only as its page names it: the page's og:image carries the
+// v its site hashed from what the card shows, so an edited post gets a new
+// card. A request with any other v (or none) is sent to the card the page
+// names, kept five minutes, and nothing is drawn; a page whose og:image is
+// not this card has none here. A drawn card is kept a year, keyed on the path
+// and v, behind Origin Shield so the edges share one copy; one whose photo
+// couldn't be had just now is kept five minutes, so it is drawn again with
+// it. A post that doesn't exist is a 404, kept five minutes. One log line a
+// request, never a post's words.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cardFor } from './card.mjs';
-import { fetchPhoto, fetchPost, postFor, SITES } from './post.mjs';
+import { fetchPhoto, fetchPost, namedVersion, postFor, SITES } from './post.mjs';
 import { prepare, render } from './render.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +27,9 @@ const CODE = process.env.CARDS_CODE || 'local';
 
 // Start loading the fonts and resvg while the first request is on its way.
 prepare(DIR).catch(() => {});
+
+const BRIEF = 'public, max-age=300';
+const YEAR = 'public, max-age=86400, s-maxage=31536000';
 
 const text = (statusCode, body, cache) => ({
   statusCode,
@@ -51,28 +59,56 @@ export async function handler(event) {
   const target = postFor(route);
   if (!target) {
     log(404);
-    return text(404, 'Not a card', 'public, max-age=300');
+    return text(404, 'Not a card', BRIEF);
   }
+  const v = new URLSearchParams(event.rawQueryString ?? '').get('v') ?? '';
   try {
     const post = await fetchPost(target.url);
     if (!post) {
       log(404, { reason: 'no post' });
-      return text(404, 'No such post', 'public, max-age=300');
+      return text(404, 'No such post', BRIEF);
     }
-    const photo = await fetchPhoto(post.photo);
+    const named = namedVersion(post.card, route);
+    if (named === null) {
+      log(404, { reason: 'not named', v });
+      return text(404, 'The page names no card here', BRIEF);
+    }
+    if (named !== v) {
+      log(302, { reason: 'other v', v, named });
+      return {
+        statusCode: 302,
+        headers: { location: named ? `${route}?v=${encodeURIComponent(named)}` : route, 'cache-control': BRIEF },
+        body: '',
+      };
+    }
+    const photoStart = Date.now();
+    let photo = null;
+    let state = post.photo ? 'drawn' : 'none';
+    try {
+      photo = await fetchPhoto(post.photo);
+      if (post.photo && !photo) state = 'skipped';
+    } catch {
+      state = 'failed';
+    }
+    const drawStart = Date.now();
     const png = await render(cardFor(post, { site: SITES[target.site], photo, kicker: target.kicker }), DIR);
-    log(200, { site: target.site, bytes: png.length, photo: Boolean(photo), titled: Boolean(post.title) });
+    log(200, {
+      site: target.site,
+      v,
+      bytes: png.length,
+      photo: state,
+      photoMs: drawStart - photoStart,
+      drawMs: Date.now() - drawStart,
+      titled: Boolean(post.title),
+    });
     return {
       statusCode: 200,
-      headers: {
-        'content-type': 'image/png',
-        'cache-control': 'public, max-age=86400, s-maxage=31536000',
-      },
+      headers: { 'content-type': 'image/png', 'cache-control': state === 'failed' ? BRIEF : YEAR },
       body: png.toString('base64'),
       isBase64Encoded: true,
     };
   } catch (error) {
-    log(502, { error: String(error?.message ?? error).slice(0, 300) });
+    log(502, { v, error: String(error?.message ?? error).slice(0, 300) });
     return text(502, 'The card could not be drawn', 'no-store');
   }
 }

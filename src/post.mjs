@@ -19,9 +19,17 @@
 // wide; on Weekly Thing, the issue's cover (u-featured), from the files CDN.
 // Another Thing's episodes share the show's artwork, so its cards have none.
 //
-// Only the sites below and their photo hosts are ever fetched.
+// The page also names its own card: its og:image, with the v the site hashed
+// from what the card shows. The handler draws only the card a page names.
+//
+// Only the sites below and their photo hosts are ever fetched, a redirect is
+// followed only within the host it started on, and nothing is read past a
+// size limit.
 import { mf2 } from 'microformats-parser';
-import { parseFragment } from 'parse5';
+import { parse, parseFragment } from 'parse5';
+
+/** Where the cards are served; a page's og:image names one of them. */
+export const CARDS = 'https://cards.thingelstad.com';
 
 const UPLOADS = ['https://www.thingelstad.com/uploads/', 'https://cdn.uploads.micro.blog/'];
 const RESIZER = 'https://micro.blog/photos/1200x/';
@@ -135,7 +143,37 @@ export function readPost(html, url) {
       site === 'www' ? firstPhoto(contentHtml) : site === 'weekly' && COVER.test(featured) ? featured : null,
     // An issue's links and journal entries, as its page counts them.
     counts: site === 'weekly' ? { links: count(p['link-count']), journal: count(p['journal-count']) } : null,
+    card: namedCard(html),
   };
+}
+
+/** The page's og:image, from its head, or null. */
+export function namedCard(html) {
+  let found = null;
+  const walk = (node) => {
+    if (found !== null || node.nodeName === 'body') return;
+    if (node.nodeName === 'meta') {
+      const attr = Object.fromEntries((node.attrs ?? []).map((a) => [a.name, a.value]));
+      if (attr.property === 'og:image') found = attr.content ?? '';
+      return;
+    }
+    for (const child of node.childNodes ?? []) walk(child);
+  };
+  walk(parse(html ?? ''));
+  return found || null;
+}
+
+/** The v a page gives the card at path: '' when it names that card with no
+ * v, null when its og:image is not that card. */
+export function namedVersion(card, path) {
+  let url;
+  try {
+    url = new URL(card ?? '');
+  } catch {
+    return null;
+  }
+  if (url.origin !== CARDS || url.pathname !== path) return null;
+  return url.searchParams.get('v') ?? '';
 }
 
 const count = (values) => {
@@ -147,42 +185,92 @@ const count = (values) => {
 const COVER = /^https:\/\/files\.thingelstad\.com\/weekly-thing\/[A-Za-z0-9/_.-]+\.(jpe?g|png)$/i;
 
 const TIMEOUT = 8000;
+const HOPS = 3;
+// Far past anything real: an issue page is under 100 KB, a resized photo
+// under 2 MB.
+const PAGE_LIMIT = 2 * 1024 * 1024;
+const PHOTO_LIMIT = 10 * 1024 * 1024;
 
-async function get(url, accept) {
-  const response = await fetch(url, {
-    headers: { accept, 'user-agent': 'cards.thingelstad.com (+https://www.thingelstad.com/)' },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(TIMEOUT),
-  });
-  return response;
+// A body not wanted is cancelled, never waited on.
+const discard = (response) => response.body?.cancel().catch(() => {});
+
+/** Up to limit bytes of the response's body, or null when it runs past. */
+async function readCapped(response, limit) {
+  if (Number(response.headers.get('content-length')) > limit) {
+    discard(response);
+    return null;
+  }
+  const chunks = [];
+  let size = 0;
+  // Leaving the loop early cancels the rest of the body.
+  for await (const chunk of response.body ?? []) {
+    size += chunk.length;
+    if (size > limit) return null;
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+/** GET url, following a redirect only within url's own origin (three at
+ * most), all within one timeout. { status, offsite, type, body }: body is the
+ * Buffer of a 2xx answer, null for anything else or one past limit; offsite
+ * is true when the answer was a redirect to another origin, never followed.
+ * Throws when the host can't be reached in time. */
+export async function get(url, accept, limit) {
+  const signal = AbortSignal.timeout(TIMEOUT);
+  const { origin } = new URL(url);
+  let at = url;
+  for (let hop = 0; ; hop++) {
+    const response = await fetch(at, {
+      headers: { accept, 'user-agent': 'cards.thingelstad.com (+https://www.thingelstad.com/)' },
+      redirect: 'manual',
+      signal,
+    });
+    const location = response.headers.get('location');
+    if (response.status >= 300 && response.status < 400 && location) {
+      discard(response);
+      const next = new URL(location, at);
+      if (next.origin !== origin) return { status: response.status, offsite: true, type: '', body: null };
+      if (hop >= HOPS) return { status: response.status, offsite: false, type: '', body: null };
+      at = next.href;
+      continue;
+    }
+    const type = (response.headers.get('content-type') ?? '').split(';')[0].trim();
+    if (!response.ok) {
+      discard(response);
+      return { status: response.status, offsite: false, type, body: null };
+    }
+    return { status: response.status, offsite: false, type, body: await readCapped(response, limit) };
+  }
 }
 
 /** The post at url, read for its card; null when the site has no such post. */
 export async function fetchPost(url) {
-  const response = await get(url, 'text/html');
+  const response = await get(url, 'text/html', PAGE_LIMIT);
   if (response.status === 404 || response.status === 410) return null;
-  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
   // A post that redirects off its site has no card here.
-  if (new URL(response.url).origin !== new URL(url).origin) return null;
-  return readPost(await response.text(), url);
+  if (response.offsite) return null;
+  if (!response.body) throw new Error(`${url}: HTTP ${response.status}${response.status < 300 ? ', too large' : ''}`);
+  return readPost(response.body.toString('utf8'), url);
 }
 
 const TYPES = new Set(['image/jpeg', 'image/png', 'image/gif']);
 
-/** A photo as a data URI the renderer can draw, or null if it can't be had.
- * A blog upload comes through micro.blog's resizer; a Weekly Thing cover is
- * already 1200px wide and comes as it is. */
+/** A photo as a data URI the renderer can draw, or null when there is none
+ * it can draw: no photo, another host, gone, too large, or a type it can't
+ * draw. Throws when the photo couldn't be had just now (unreachable, slow, a
+ * server error), so the handler keeps that card only briefly. A blog upload
+ * comes through micro.blog's resizer; a Weekly Thing cover is already 1200px
+ * wide and comes as it is. */
 export async function fetchPhoto(src) {
   if (!src) return null;
   const from = COVER.test(src) ? src : UPLOADS.some((prefix) => src.startsWith(prefix)) ? `${RESIZER}${src}` : null;
   if (!from) return null;
-  try {
-    const response = await get(from, 'image/jpeg,image/png;q=0.9,image/gif;q=0.8');
-    const type = (response.headers.get('content-type') ?? '').split(';')[0].trim();
-    if (!response.ok || !TYPES.has(type)) return null;
-    const data = Buffer.from(await response.arrayBuffer());
-    return { src: `data:${type};base64,${data.toString('base64')}`, screenshot: /\.png(\?.*)?$/i.test(src) };
-  } catch {
-    return null;
-  }
+  const response = await get(from, 'image/jpeg,image/png;q=0.9,image/gif;q=0.8', PHOTO_LIMIT);
+  if (response.status === 429 || response.status >= 500) throw new Error(`${from}: HTTP ${response.status}`);
+  if (!response.body || !TYPES.has(response.type)) return null;
+  return {
+    src: `data:${response.type};base64,${response.body.toString('base64')}`,
+    screenshot: /\.png(\?.*)?$/i.test(src),
+  };
 }
