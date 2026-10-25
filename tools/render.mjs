@@ -25,6 +25,8 @@ function pathFor(url) {
   const { origin, pathname } = new URL(url);
   const site = Object.keys(SITES).find((id) => SITES[id].origin === origin);
   if (!site) return url;
+  // The newsletter's front page is its own card, /weekly/index.png.
+  if (pathname === '/') return `/${site}/index.png`;
   return `/${site}${pathname.replace(/\.html$/, '').replace(/\/$/, '')}.png`;
 }
 
@@ -35,7 +37,7 @@ for (const target of targets) {
   const post = postFor(cardPath);
   if (!post) throw new Error(`${target} is not a post, issue or episode`);
   const started = Date.now();
-  const data = await fetchPost(post.url);
+  const data = await fetchPost(post.url, post);
   if (!data) throw new Error(`${post.url}: no such post`);
   const photo = await fetchPhoto(data.photo).catch((error) => {
     console.warn(`${target}: drawn without its photo (${error.message})`);

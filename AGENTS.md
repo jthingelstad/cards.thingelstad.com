@@ -26,7 +26,13 @@ and each site's own `base.njk` sets `og:image`, with `v` a hash of what the
 card shows:
 
     https://cards.thingelstad.com/weekly/archive/353.png?v=<hash>
+    https://cards.thingelstad.com/weekly/index.png?v=<hash>
     https://cards.thingelstad.com/another/2025/10/05/how-do-you-start-a.png?v=<hash>
+
+Then richer (Jamie, 2026-10-25: "make it rich and inviting and equal to the
+quality of the thing it is previewing"): every Weekly Thing and Another Thing
+card is dark, its words in white, and only the blog keeps the black-and-white
+card.
 
 - **An issue** is drawn from its page's h-entry: the issue number as kicker,
   the dek (`p-summary`) as its words, and the counts the page publishes as
@@ -34,11 +40,21 @@ card shows:
   issue with a cover (`u-featured`, only `files.thingelstad.com/weekly-thing/`)
   sets all of that in white over the cover, darkened top and bottom (Jamie:
   "text overlaid on the issue image with the subtitle/dek included. Counts of
-  links and journal entries?"); the early issues with none get the white card
-  with the counts under the dek. An issue titled only with its date ("May 5,
-  2018") isn't dated twice.
-- **An episode** is the white card with its summary: no photo, since the
-  show's art is its own.
+  links and journal entries?"); the early issues with none get the same words
+  on the newsletter's blue under a large faint W, its logo letter. An issue
+  titled only with its date ("May 5, 2018") isn't dated twice.
+- **The newsletter's front page** (`/weekly/index.png`) is drawn from the
+  h-feed on its hero: the logo and name (`p-name`), the eyebrow (`p-kicker`),
+  the hero line (`e-summary`, its line breaks kept and its `em` in the light
+  blue), the newest cover (`u-featured`) darkened to the left, and the
+  archive's size (`p-issue-count`, `p-link-count`: "353 issues · 6,510
+  links"). Every page there but an issue or a topic with its own image shares
+  it.
+- **An episode** is drawn on the show's slate with its three dots: the
+  episode's number (`p-episode`) and date, its title and summary, and a listen
+  button with its running time (`p-duration`, seconds, worded as the site's
+  `friendlyDuration`: "11 min"). A page without them still gets the card,
+  without those words. No photo: the show's art is its own.
 - The blog reads its own words, never a `p-summary`. The site's label in the
   band takes its sites-strip colour.
 
@@ -46,7 +62,8 @@ card shows:
 
 - `src/post.mjs` fetches the post and reads its h-entry (p-name, e-content,
   dt-published, p-category, and for issues p-summary, u-featured and the
-  counts) and its photo: a blog post's first upload, through micro.blog's
+  counts; for episodes the number and running time), or the front page's
+  h-feed, and its photo: a blog post's first upload, through micro.blog's
   resizer, or an issue's cover straight from `files.thingelstad.com`. It
   fetches nothing but the three sites and those photo hosts, follows a
   redirect only within the host it started on (a post that redirects off its

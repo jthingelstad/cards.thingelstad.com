@@ -5,11 +5,13 @@
 //   /www/2026/10/15/the-nnxyz-rooms.png      https://www.thingelstad.com/2026/10/15/the-nnxyz-rooms.html
 //   /weekly/archive/353.png                  https://weekly.thingelstad.com/archive/353/
 //   /another/2025/10/05/how-do-you-start-a.png  https://another.thingelstad.com/2025/10/05/how-do-you-start-a.html
+//   /weekly/index.png                        https://weekly.thingelstad.com/ (the newsletter's own card)
 //
 // The post is fetched and read as an h-entry, the microformats every post,
 // issue and episode carries: p-name (titled posts only; a micropost has
 // none), p-summary, e-content, dt-published, p-category and u-featured, and
-// on an issue p-link-count and p-journal-count. An
+// on an issue p-link-count and p-journal-count, on an episode p-episode and
+// p-duration (seconds). An
 // issue's or episode's words are its summary when it has one, else its
 // content's; a blog post's are always its content's.
 //
@@ -18,6 +20,11 @@
 // text on the blog too), fetched through micro.blog's resizer at 1200px
 // wide; on Weekly Thing, the issue's cover (u-featured), from the files CDN.
 // Another Thing's episodes share the show's artwork, so its cards have none.
+//
+// Weekly Thing's front page is an h-feed instead: p-name, p-kicker (the
+// eyebrow), e-summary (the hero line, its <em> the accent and its <br> the
+// line breaks), u-featured (the newest cover), p-issue-count and
+// p-link-count. Every page there but an issue or a topic shares that card.
 //
 // The page also names its own card: its og:image, with the v the site hashed
 // from what the card shows. The handler draws only the card a page names.
@@ -52,6 +59,7 @@ export function postFor(path) {
   const [, site, rest] = match;
   const { origin } = SITES[site];
   if (site === 'weekly') {
+    if (rest === 'index') return { site, url: `${origin}/`, home: true };
     const issue = ISSUE.exec(rest);
     // WT353 (and WT140 special) over the title, as the issue page's own bar.
     return issue
@@ -108,10 +116,10 @@ export function firstPhoto(html) {
   return found;
 }
 
-const findEntry = (items) => {
+const findItem = (items, type) => {
   for (const item of items) {
-    if (item.type?.includes('h-entry')) return item;
-    const child = findEntry(item.children ?? []);
+    if (item.type?.includes(type)) return item;
+    const child = findItem(item.children ?? [], type);
     if (child) return child;
   }
   return null;
@@ -122,9 +130,60 @@ const first = (values) => {
   return typeof value === 'string' ? value : (value?.value ?? undefined);
 };
 
-/** The card's words from a post page's HTML. */
-export function readPost(html, url) {
-  const entry = findEntry(mf2(html, { baseUrl: url }).items);
+/** A headline's HTML as lines of runs: its <br> end a line, and the words in
+ * its <em> or <strong> are the accent. */
+export function headlineLines(html) {
+  const lines = [[]];
+  const walk = (node, accent) => {
+    if (node.nodeName === '#text') lines.at(-1).push({ text: node.value, accent });
+    else if (node.nodeName === 'br') lines.push([]);
+    else for (const child of node.childNodes ?? []) walk(child, accent || node.nodeName === 'em' || node.nodeName === 'strong');
+  };
+  walk(parseFragment(html ?? ''), false);
+  return lines
+    .map((runs) => {
+      const tidy = runs.map((run) => ({ ...run, text: run.text.replace(/\s+/g, ' ') })).filter((run) => run.text);
+      if (tidy.length) {
+        tidy[0].text = tidy[0].text.trimStart();
+        tidy.at(-1).text = tidy.at(-1).text.trimEnd();
+      }
+      return tidy.filter((run) => run.text);
+    })
+    .filter((runs) => runs.length);
+}
+
+/** The newsletter's own card, from its front page's h-feed. */
+function readFeed(feed, html, url) {
+  const p = feed.properties;
+  const summary = p.summary?.[0];
+  const featured = first(p.featured) ?? '';
+  const headline = headlineLines(typeof summary === 'string' ? summary : (summary?.html ?? ''));
+  return {
+    url,
+    site: 'weekly',
+    home: true,
+    title: (first(p.name) ?? '').replace(/\s+/g, ' ').trim(),
+    kicker: (first(p.kicker) ?? '').replace(/\s+/g, ' ').trim(),
+    headline,
+    text: headline.map((runs) => runs.map((run) => run.text).join('')).join(' '),
+    published: null,
+    categories: [],
+    photo: COVER.test(featured) ? featured : null,
+    counts: { issues: count(p['issue-count']), links: count(p['link-count']) },
+    card: namedCard(html),
+  };
+}
+
+/** The card's words from a post page's HTML; home reads the newsletter's
+ * front page. */
+export function readPost(html, url, { home = false } = {}) {
+  const items = mf2(html, { baseUrl: url }).items;
+  if (home) {
+    const feed = findItem(items, 'h-feed');
+    if (!feed) throw new Error(`no h-feed at ${url}`);
+    return readFeed(feed, html, url);
+  }
+  const entry = findItem(items, 'h-entry');
   if (!entry) throw new Error(`no h-entry at ${url}`);
   const p = entry.properties;
   const content = p.content?.[0];
@@ -134,6 +193,7 @@ export function readPost(html, url) {
   const site = Object.keys(SITES).find((id) => SITES[id].origin === new URL(url).origin);
   return {
     url,
+    site,
     title: (first(p.name) ?? '').replace(/\s+/g, ' ').trim(),
     // The blog's cards keep reading the post's own words.
     text: (site !== 'www' && summary) || plainText(contentHtml),
@@ -143,6 +203,8 @@ export function readPost(html, url) {
       site === 'www' ? firstPhoto(contentHtml) : site === 'weekly' && COVER.test(featured) ? featured : null,
     // An issue's links and journal entries, as its page counts them.
     counts: site === 'weekly' ? { links: count(p['link-count']), journal: count(p['journal-count']) } : null,
+    // An episode's number and running time, as its page gives them.
+    episode: site === 'another' ? { number: count(p.episode), seconds: count(p.duration) } : null,
     card: namedCard(html),
   };
 }
@@ -244,14 +306,15 @@ export async function get(url, accept, limit) {
   }
 }
 
-/** The post at url, read for its card; null when the site has no such post. */
-export async function fetchPost(url) {
+/** The post at url, read for its card; null when the site has no such post.
+ * home: url is the newsletter's front page. */
+export async function fetchPost(url, { home = false } = {}) {
   const response = await get(url, 'text/html', PAGE_LIMIT);
   if (response.status === 404 || response.status === 410) return null;
   // A post that redirects off its site has no card here.
   if (response.offsite) return null;
   if (!response.body) throw new Error(`${url}: HTTP ${response.status}${response.status < 300 ? ', too large' : ''}`);
-  return readPost(response.body.toString('utf8'), url);
+  return readPost(response.body.toString('utf8'), url, { home });
 }
 
 const TYPES = new Set(['image/jpeg', 'image/png', 'image/gif']);

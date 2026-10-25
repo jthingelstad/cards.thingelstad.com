@@ -65,7 +65,7 @@ export async function handler(event) {
   const query = event.rawQueryString ?? '';
   const v = new URLSearchParams(query).get('v') ?? '';
   try {
-    const post = await fetchPost(target.url);
+    const post = await fetchPost(target.url, target);
     if (!post) {
       log(404, { reason: 'no post' });
       return text(404, 'No such post', BRIEF);

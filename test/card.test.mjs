@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cardFor, excerpt, fitSize, formatDate, HEIGHT, WIDTH } from '../src/card.mjs';
+import { cardFor, durationLabel, excerpt, fitSize, formatDate, HEIGHT, WIDTH } from '../src/card.mjs';
 import { SITES } from '../src/post.mjs';
 import { emojiAsset, emojiFiles, render } from '../src/render.mjs';
 import { stageAssets } from '../tools/package.mjs';
@@ -25,6 +25,24 @@ test('a title shrinks until its longest word fits a line', () => {
 });
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+// A 1 x 1 PNG, standing in for a cover.
+const DOT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+// The newsletter's front page, as post.mjs reads its h-feed.
+const HOME = {
+  site: 'weekly',
+  home: true,
+  title: 'Weekly Thing',
+  kicker: 'Weekend reading since 2017',
+  headline: [
+    [{ text: 'A weekend letter', accent: false }],
+    [{ text: 'about ', accent: false }, { text: 'what I’m', accent: true }],
+    [{ text: 'learning.', accent: true }],
+  ],
+  text: 'A weekend letter about what I’m learning.',
+  published: null,
+  categories: [],
+  counts: { issues: 353, links: 6510 },
+};
 
 test('every kind of card draws a 1200 x 630 PNG', async () => {
   const dir = await stageAssets();
@@ -42,11 +60,20 @@ test('every kind of card draws a 1200 x 630 PNG', async () => {
     assert.equal(png.readUInt32BE(16), WIDTH);
     assert.equal(png.readUInt32BE(20), HEIGHT);
   }
-  // An issue with no cover, and an episode: the kicker and the site's mark.
-  for (const [site, kicker] of [[SITES.weekly, 'WT1'], [SITES.another, undefined]]) {
-    const post = { title: 'Weekly Thing for May 13, 2017', text: 'Layne Kennedy, Minnesota Original.', published: '2017-05-13T13:00:00Z', categories: [], photo: null };
-    const png = await render(cardFor(post, { site, photo: null, kicker }), dir);
+  // An issue with no cover, an episode, and the newsletter's front page with
+  // and without its cover.
+  const issue = { title: 'Weekly Thing for May 13, 2017', text: 'Layne Kennedy, Minnesota Original.', published: '2017-05-13T13:00:00Z', categories: [], photo: null, counts: { links: 17, journal: 0 } };
+  const episode = { title: 'How do you start a podcast?', text: 'Stepping into podcasting.', published: '2025-10-05T12:00:00Z', categories: [], photo: null, episode: { number: 1, seconds: 635 } };
+  for (const [post, opts] of [
+    [issue, { site: SITES.weekly, photo: null, kicker: 'WT1' }],
+    [episode, { site: SITES.another, photo: null }],
+    [HOME, { site: SITES.weekly, photo: { src: DOT } }],
+    [HOME, { site: SITES.weekly, photo: null }],
+  ]) {
+    const png = await render(cardFor(post, opts), dir);
+    assert.deepEqual(png.subarray(0, 8), PNG);
     assert.equal(png.readUInt32BE(16), WIDTH);
+    assert.equal(png.readUInt32BE(20), HEIGHT);
   }
 });
 
@@ -60,8 +87,6 @@ test('an issue card names the issue before the date, and its site in its colour'
   assert.match(JSON.stringify(cardFor(dated, { site: SITES.weekly, photo: null, kicker: 'WT52' })), /"children":"WT52"/);
 });
 
-// A 1 x 1 PNG, standing in for a cover.
-const DOT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
 test('an issue with a cover sets its words over it, with its counts', async () => {
   const dir = await stageAssets();
@@ -84,6 +109,49 @@ test('an issue with a cover sets its words over it, with its counts', async () =
   const one = JSON.stringify(cardFor({ ...post, counts: { links: 1, journal: 0 } }, { site: SITES.weekly, photo: null, kicker: 'WT353' }));
   assert.match(one, /"children":"1 link"/);
   assert.doesNotMatch(one, /journal/);
+});
+
+test('an issue with no cover is drawn on the newsletter blue under its W', () => {
+  const post = { title: 'Weekly Thing for May 13, 2017', text: 'Layne Kennedy.', published: '2017-05-13T13:00:00Z', categories: [], counts: { links: 17, journal: 0 } };
+  const words = JSON.stringify(cardFor(post, { site: SITES.weekly, photo: null, kicker: 'WT1' }));
+  assert.match(words, /linear-gradient\(135deg, #1f6fd6/);
+  assert.match(words, /data:image\/svg\+xml;base64,/);
+  assert.match(words, /"children":"WT1 · May 13, 2017"/);
+  assert.match(words, /"children":"17 links"/);
+});
+
+test('an episode reads as the show: its number, date, running time and a listen button', () => {
+  const post = { title: 'How do you start a podcast?', text: 'Stepping into podcasting.', published: '2025-10-05T12:00:00Z', categories: [], episode: { number: 1, seconds: 635 } };
+  const words = JSON.stringify(cardFor(post, { site: SITES.another, photo: null }));
+  assert.match(words, /"children":"EPISODE 1 · OCTOBER 5, 2025"/);
+  assert.match(words, /"children":"Another Thing"/);
+  assert.match(words, /"children":"Listen · 11 min"/);
+  assert.match(words, /"color":"#b3123f"},"children":"Podcast"/);
+  // A page that doesn't say its number or length still gets the card.
+  const bare = JSON.stringify(cardFor({ ...post, episode: { number: 0, seconds: 0 } }, { site: SITES.another, photo: null }));
+  assert.match(bare, /"children":"OCTOBER 5, 2025"/);
+  assert.match(bare, /"children":"Listen"/);
+});
+
+test('a running time reads as the episode page says it', () => {
+  assert.equal(durationLabel(635), '11 min');
+  assert.equal(durationLabel(3600), '1 hr');
+  assert.equal(durationLabel(3900), '1 hr 5 min');
+  assert.equal(durationLabel(29), '0 min');
+  assert.equal(durationLabel('nope'), '0 min');
+});
+
+test('the front page card carries its hero line, accent and archive size', () => {
+  const words = JSON.stringify(cardFor(HOME, { site: SITES.weekly, photo: { src: DOT } }));
+  assert.match(words, /"children":"WEEKEND READING SINCE 2017"/);
+  assert.match(words, /"color":"#8fbcf5","whiteSpace":"pre"},"children":"what I’m"/);
+  assert.match(words, /"color":"#ffffff","whiteSpace":"pre"},"children":"about "/);
+  assert.match(words, /"children":"353 issues · 6,510 links"/);
+  assert.match(words, /"children":"Weekly Thing"/);
+  // No hero line read: the name stands in; no counts, no counts line.
+  const bare = JSON.stringify(cardFor({ ...HOME, headline: [], counts: { issues: 0, links: 0 } }, { site: SITES.weekly, photo: null }));
+  assert.doesNotMatch(bare, /issues/);
+  assert.match(bare, /"whiteSpace":"pre"},"children":"Weekly Thing"/);
 });
 
 const emoji = (...points) => String.fromCodePoint(...points);
