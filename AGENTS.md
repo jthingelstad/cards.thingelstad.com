@@ -8,8 +8,8 @@
 The card maker: the 1200 x 630 social card (Open Graph and Twitter image) for
 each post on Jamie's sites, drawn from the post itself. Decided with Jamie on
 2026-10-24 after micro.blog's own card styles were rejected: the full canvas,
-no photo of Jamie, the blog's type in black and white, and photo posts get the
-card too (the photo takes the right half).
+no photo of Jamie, the blog's type in black and white (on black since the
+2026-10-25 design pass), and photo posts get the card too.
 
     https://cards.thingelstad.com/www/2026/10/15/the-nnxyz-rooms.png?v=<hash>
 
@@ -39,8 +39,22 @@ there keeps the site's one share image.
 
 Then richer (Jamie, 2026-10-25: "make it rich and inviting and equal to the
 quality of the thing it is previewing"): every Weekly Thing and Another Thing
-card is dark, its words in white, and only the blog keeps the black-and-white
-card.
+card went dark, its words in white.
+
+Then the design pass (2026-10-25, worked out on the canvas at
+claude.ai/artifact/TF23AaDQfNUH4WibFtdZpb; Jamie: "Approved: build and deploy
+the cards.thingelstad.com redesign (dark Links cards, black blog cards,
+photo-card polish, square photos on black), first sentence as headline only
+when short, after showing previews"): every card is dark now, under one dark
+band (`#0e0e12`) whose site label takes the site's dark-mode strip colour
+(`mark` in `src/sites.mjs`; the strip's light ink `#ececf0` for a site with
+none). Every kicker is small capitals, every headline sits under a short bar
+and is broken into even lines by `breakLines` (Satori's own `textWrap:
+'balance'` misbreaks under a clamp), and an issue's counts are pills. Jamie's
+calls on it: Links "color: dark mode", the blog "prefer the black ground", and
+no running total of links on any card ("that number changes all the time").
+Another Thing was added at Jamie's ask the same day ("we didn't get a design
+for Another Thing podcast episodes… we need that one too").
 
 - **An issue** is drawn from its page's h-entry: the issue number as kicker,
   the dek (`p-summary`) as its words, and the counts the page publishes as
@@ -58,20 +72,26 @@ card.
   archive's size (`p-issue-count`, `p-link-count`: "353 issues · 6,510
   links"). Every page there but an issue or a topic with its own image shares
   it.
-- **An episode** is drawn on the show's slate with its three dots: the
-  episode's number (`p-episode`) and date, its title and summary, and a listen
-  button with its running time (`p-duration`, seconds, worded as the site's
-  `friendlyDuration`: "11 min"). A page without them still gets the card,
-  without those words. No photo: the show's art is its own.
-- **A saved link** is drawn on white, the way its record page reads: the day
-  saved (`dt-published`) and the issues that carried it (`p-issue`, as the
-  page's "In WT353" chips), then the host it points at (`p-host`), the title
-  (`p-name`) in the site's link blue, underlined, and the note (`e-content`)
+- **An episode** is drawn on the show's slate with its three dots, and the
+  dots again, large, at the right: the crimson one is the play button, with
+  "Listen" and the running time under it (`p-duration`, seconds, worded as
+  the site's `friendlyDuration`: "11 min"). At the foot, the episode's number
+  (`p-episode`) and date, its title and summary. A page without them still
+  gets the card, without those words. No photo: the show's art is its own.
+- **A saved link** is drawn on black, the way its record page reads: the host
+  it points at (`p-host`) in a chip and again very large and faint behind
+  the words, the issues that carried it (`p-issue`, as "In WT353" chips, two
+  and then "+N"), the day saved (`dt-published`), then the title (`p-name`)
+  in white, each line underlined in the dark-mode link blue `#78acf2` (a rule
+  under the line, since Satori's underline runs through descenders), and the
+  note (`e-content`), quoted and marked "Jamie's note",
   only when the page's `p-voice` is `jamie`: a quotation from the page
   (`excerpt`), a note around one (`mixed`), an agent's summary (`agent`) or a
   note on a page that doesn't say whose it is never reaches the card. A
   title too long for its lines is cut at a word before it is drawn, since a
-  line Satori clamps loses its underline. No photo.
+  line Satori clamps loses its underline. No photo yet: the linked page's own
+  `og:image` is a later step (Jamie: fine "if it sticks to the metadata"),
+  not built.
 - The blog reads its own words, never a `p-summary`. The site's label in the
   band takes its sites-strip colour.
 - **A blog photo post** sets its words in white over its photo, the way an
@@ -79,13 +99,20 @@ card.
   overlay on blog previews too"), when the photo is wide (at least 1.3 wide
   for each 1 high), isn't a screenshot, its size is known, and the post has a
   title or is a micropost of 80 characters or fewer: the headline large, a
-  title's text under it. Any other photo post keeps the split card, the photo
-  on the right half. `overPhoto` in `src/card.mjs` is that rule; `OVERLAY`
-  holds its three settings (`wide`, `words`, and `top`, how dark the top of
+  title's text under it, the photo darkened at the top, toward the foot and
+  from the left. A screenshot runs off the card's right edge in a frame beside
+  the words. Any other photo (square or tall) stands full height on the right
+  half, faded into black under the words, with the band under the words
+  only. `overPhoto` in `src/card.mjs` is that rule; `OVERLAY` holds its three settings (`wide`, `words`, and `top`, how dark the top of
   the photo is, which issue covers share), each one Jamie's call. Jamie
   chose 1.3, 80 and 0.72 on 2026-10-25 ("with the defaults: no square
   photos, 80 characters, darker top 0.72"), after previews showed a square
   photo losing its subject to the crop and 150 characters covering it.
+- **A blog post with no photo** is white on black. A titled post is its title
+  and the start of its text. A micropost past 90 characters whose first
+  sentence is 12 to 60 characters leads with that sentence as the headline and
+  the rest under it (`lede`; Jamie: "first sentence as headline only when
+  short"); any other micropost is set whole, larger the shorter it is.
 
 ## How it works
 
