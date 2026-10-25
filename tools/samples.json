@@ -1,0 +1,17 @@
+{
+  "about": "One live page for each way a card is drawn, for npm run previews. A site that joins adds a page for each of its layouts; a layout that changes keeps its page here.",
+  "samples": [
+    { "url": "https://www.thingelstad.com/2026/10/24/red-leaves.html", "shows": "blog: a micropost over its wide photo" },
+    { "url": "https://www.thingelstad.com/2026/10/24/melting-wax-to-pour-some.html", "shows": "blog: a square photo on black beside the words" },
+    { "url": "https://www.thingelstad.com/2026/10/24/phishing-fear.html", "shows": "blog: a titled post with a screenshot off the corner" },
+    { "url": "https://www.thingelstad.com/2026/10/24/release-notes-on-a-map.html", "shows": "blog: a wide screenshot" },
+    { "url": "https://www.thingelstad.com/2026/10/23/worked-with-claude-today-and.html", "shows": "blog: no photo, a micropost led by its first sentence" },
+    { "url": "https://weekly.thingelstad.com/archive/353/", "shows": "weekly: an issue over its cover, with its counts" },
+    { "url": "https://weekly.thingelstad.com/archive/1/", "shows": "weekly: an early issue with no cover, on the blue under the W" },
+    { "url": "https://weekly.thingelstad.com/", "shows": "weekly: the front page" },
+    { "url": "https://another.thingelstad.com/2025/10/05/how-do-you-start-a.html", "shows": "another: an episode" },
+    { "url": "https://links.thingelstad.xyz/links/11ad6e13661a/", "shows": "links: a saved link with Jamie's note and an issue" },
+    { "url": "https://links.thingelstad.xyz/links/a247e5eef435/", "shows": "links: a saved link, no note" },
+    { "url": "https://links.thingelstad.xyz/links/2ca5ff97f513/", "shows": "links: a long title on three lines" }
+  ]
+}

@@ -1,6 +1,10 @@
 // Draw cards on this Mac, the way the Lambda does, reading the live posts.
 //
 //   node tools/render.mjs <post URL or card path>... [--out=<dir>] [--root=<dir>] [--overlay=<json>]
+//   node tools/render.mjs --samples [--out=<dir>]   (npm run previews)
+//
+// --samples draws the pages in tools/samples.json, one for each way a card
+// is drawn, so every change to a layout is looked at against the same cards.
 //
 // --overlay='{"wide":0.95,"words":150,"top":0.6}' draws the blog overlay with
 // other settings than OVERLAY in src/card.mjs, to compare them.
@@ -23,9 +27,12 @@ const args = process.argv.slice(2);
 const out = args.find((a) => a.startsWith('--out='))?.slice(6) ?? path.join(OUT, 'preview');
 const root = args.find((a) => a.startsWith('--root='))?.slice(7);
 const overlay = JSON.parse(args.find((a) => a.startsWith('--overlay='))?.slice(10) ?? '{}');
-const targets = args.filter((a) => !a.startsWith('--'));
+const samples = args.includes('--samples')
+  ? JSON.parse(await fs.readFile(new URL('./samples.json', import.meta.url), 'utf8')).samples.map((sample) => sample.url)
+  : [];
+const targets = [...samples, ...args.filter((a) => !a.startsWith('--'))];
 if (!targets.length) {
-  console.error('usage: node tools/render.mjs <post URL or card path>... [--out=<dir>] [--root=<dir>] [--overlay=<json>]');
+  console.error('usage: node tools/render.mjs <post URL or card path>... [--samples] [--out=<dir>] [--root=<dir>] [--overlay=<json>]');
   process.exit(2);
 }
 
