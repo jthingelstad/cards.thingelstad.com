@@ -42,6 +42,48 @@ test('every kind of card draws a 1200 x 630 PNG', async () => {
     assert.equal(png.readUInt32BE(16), WIDTH);
     assert.equal(png.readUInt32BE(20), HEIGHT);
   }
+  // An issue with no cover, and an episode: the kicker and the site's mark.
+  for (const [site, kicker] of [[SITES.weekly, 'WT1'], [SITES.another, undefined]]) {
+    const post = { title: 'Weekly Thing for May 13, 2017', text: 'Layne Kennedy, Minnesota Original.', published: '2017-05-13T13:00:00Z', categories: [], photo: null };
+    const png = await render(cardFor(post, { site, photo: null, kicker }), dir);
+    assert.equal(png.readUInt32BE(16), WIDTH);
+  }
+});
+
+test('an issue card names the issue before the date, and its site in its colour', () => {
+  const post = { title: 'Release Notes for Every Day', text: '', published: '2026-10-10T12:00:00Z', categories: [], photo: null };
+  const words = JSON.stringify(cardFor(post, { site: SITES.weekly, photo: null, kicker: 'WT353' }));
+  assert.match(words, /WT353 · October 10, 2026/);
+  assert.match(words, /"color":"#1a5eb6"},"children":"Newsletter"/);
+  assert.match(JSON.stringify(cardFor(post, { site: SITES.www, photo: null })), /"color":"#16161a"},"children":"Blog"/);
+  const dated = { ...post, title: 'May 5, 2018', published: '2018-05-05T12:00:00Z' };
+  assert.match(JSON.stringify(cardFor(dated, { site: SITES.weekly, photo: null, kicker: 'WT52' })), /"children":"WT52"/);
+});
+
+// A 1 x 1 PNG, standing in for a cover.
+const DOT = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+test('an issue with a cover sets its words over it, with its counts', async () => {
+  const dir = await stageAssets();
+  const post = {
+    title: 'Release Notes for Every Day',
+    text: 'Your Version Number Release Notes, Claude Haiku 5.5, zkAPI.',
+    published: '2026-10-10T12:00:00Z',
+    categories: [],
+    counts: { links: 19, journal: 4 },
+  };
+  const tree = cardFor(post, { site: SITES.weekly, photo: { src: DOT }, kicker: 'WT353' });
+  const words = JSON.stringify(tree);
+  assert.match(words, /"position":"absolute"/);
+  assert.match(words, /19 links · 4 journal entries/);
+  assert.match(words, /Your Version Number Release Notes/);
+  const png = await render(tree, dir);
+  assert.equal(png.readUInt32BE(16), WIDTH);
+  assert.equal(png.readUInt32BE(20), HEIGHT);
+  // One of each says so; none is left out. With no cover, the counts go under the words.
+  const one = JSON.stringify(cardFor({ ...post, counts: { links: 1, journal: 0 } }, { site: SITES.weekly, photo: null, kicker: 'WT353' }));
+  assert.match(one, /"children":"1 link"/);
+  assert.doesNotMatch(one, /journal/);
 });
 
 const emoji = (...points) => String.fromCodePoint(...points);

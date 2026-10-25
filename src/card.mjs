@@ -9,7 +9,15 @@
 // the photo the right half. Black and white, as the blog is.
 //
 // Decided with Jamie, 2026-10-24: the full canvas, no photo of Jamie, and
-// photo posts get this card too.
+// photo posts get this card too. Weekly Thing issues and Another Thing
+// episodes got the same card on 2026-10-25 (Jamie: "Weekly Thing and Another
+// Thing issues should get custom share images with cards.thingelstad.com
+// solution."): the issue number before the date (WT353) and the site's
+// label in its sites-strip colour, its one mark. An issue with a cover is
+// drawn over it (Jamie: "text overlaid on the issue image with the
+// subtitle/dek included. Counts of links and journal entries"): the cover
+// fills the card, darkened toward the words; one without keeps this card,
+// with its dek and counts under the title.
 
 export const WIDTH = 1200;
 export const HEIGHT = 630;
@@ -76,9 +84,98 @@ function noteStyle(n, photo) {
   return { fontSize: photo ? 32 : 38, fontFamily: 'Inter', fontWeight: 500, lines: photo ? 8 : 7 };
 }
 
+/** "19 links · 4 journal entries", leaving out what an issue has none of. */
+export function countsLine(counts) {
+  const part = (n, one, many) => (n > 0 ? `${n} ${n === 1 ? one : many}` : '');
+  return [part(counts?.links, 'link', 'links'), part(counts?.journal, 'journal entry', 'journal entries')]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+const BAND = 68;
+const WHITE = '#ffffff';
+
+// Jamie Thingelstad, the site's label and its host, in the strip's grey.
+const band = (site) =>
+  h(
+    'div',
+    {
+      display: 'flex',
+      alignItems: 'center',
+      height: BAND,
+      flexShrink: 0,
+      padding: '0 64px',
+      backgroundColor: STRIP,
+      fontSize: 22,
+    },
+    h('div', { display: 'block', color: MUTED }, 'Jamie Thingelstad'),
+    h('div', { display: 'block', marginLeft: 28, fontWeight: 600, color: site.mark ?? INK }, site.label),
+    h('div', { display: 'block', marginLeft: 'auto', fontWeight: 500, color: MUTED }, site.host),
+  );
+
+const tree = (type, style, children) => ({ type, props: { style, children: children.filter(Boolean) } });
+
+// An issue over its cover: the photo fills the card above the band, darkened
+// at the top for the kicker and toward the bottom for the words.
+function overCover(post, { site, photo, meta, counts }) {
+  const width = WIDTH - 2 * PAD;
+  const height = HEIGHT - BAND;
+  const n = post.title.length;
+  const size = fitSize(n <= 28 ? 88 : n <= 56 ? 72 : 60, post.title, width, 0.64);
+  const shadow = '0 2px 18px rgba(0, 0, 0, 0.45)';
+  const fill = { position: 'absolute', top: 0, left: 0, width: WIDTH, height };
+  return h(
+    'div',
+    { display: 'flex', flexDirection: 'column', width: WIDTH, height: HEIGHT, backgroundColor: INK, fontFamily: 'Inter' },
+    h(
+      'div',
+      { display: 'flex', position: 'relative', width: WIDTH, height, flexShrink: 0 },
+      { type: 'img', props: { src: photo.src, style: { ...fill, objectFit: 'cover', objectPosition: 'center' } } },
+      h('div', {
+        ...fill,
+        display: 'flex',
+        backgroundImage:
+          'linear-gradient(180deg, rgba(10,10,14,0.6) 0%, rgba(10,10,14,0) 28%, rgba(10,10,14,0.2) 45%, rgba(10,10,14,0.9) 100%)',
+      }),
+      tree('div', { ...fill, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxSizing: 'border-box', padding: `46px ${PAD}px 40px ${PAD}px`, color: WHITE, textShadow: shadow }, [
+        h('div', { display: 'block', fontSize: 24, fontWeight: 700, letterSpacing: '0.04em' }, meta || ' '),
+        tree('div', { display: 'flex', flexDirection: 'column', width }, [
+          h(
+            'div',
+            {
+              display: 'block',
+              fontFamily: 'Inter Tight',
+              fontWeight: 800,
+              fontSize: size,
+              lineHeight: 1.02,
+              letterSpacing: '-0.025em',
+              // Not 'balance': with a clamp, Satori balances for one line
+              // more than it keeps and cuts the title at half the width.
+              lineClamp: 2,
+            },
+            post.title,
+          ),
+          post.text &&
+            h(
+              'div',
+              { display: 'block', marginTop: 20, fontSize: 27, lineHeight: 1.4, fontWeight: 500, lineClamp: 2 },
+              excerpt(post.text, 170),
+            ),
+          counts && h('div', { display: 'block', marginTop: 18, fontSize: 22, fontWeight: 700, letterSpacing: '0.02em' }, counts),
+        ]),
+      ]),
+    ),
+    band(site),
+  );
+}
+
 /** The element tree for a post's card. photo is fetchPhoto's result or null. */
-export function cardFor(post, { site, photo }) {
-  const meta = [formatDate(post.published), ...post.categories.slice(0, 3)].filter(Boolean).join(' · ');
+export function cardFor(post, { site, photo, kicker }) {
+  // An early issue titled only with its date ("May 5, 2018") isn't dated twice.
+  const date = formatDate(post.published);
+  const meta = [kicker, date === post.title ? '' : date, ...post.categories.slice(0, 3)].filter(Boolean).join(' · ');
+  const counts = countsLine(post.counts);
+  if (photo && post.counts) return overCover(post, { site, photo, meta, counts });
   const hasPhoto = Boolean(photo);
   const width = column(hasPhoto) - 2 * PAD;
   const words = [];
@@ -118,6 +215,8 @@ export function cardFor(post, { site, photo }) {
           excerpt(post.text, 220),
         ),
       );
+    if (!hasPhoto && counts)
+      words.push(h('div', { display: 'block', marginTop: 18, fontSize: 22, fontWeight: 600, color: MUTED }, counts));
   } else if (post.text) {
     const text = excerpt(post.text, hasPhoto ? 200 : 260);
     const { lines, ...style } = noteStyle(text.length, hasPhoto);
@@ -198,20 +297,6 @@ export function cardFor(post, { site, photo }) {
       color: INK,
     },
     h('div', { display: 'flex', flexGrow: 1, minHeight: 0 }, ...main),
-    h(
-      'div',
-      {
-        display: 'flex',
-        alignItems: 'center',
-        height: 68,
-        flexShrink: 0,
-        padding: '0 64px',
-        backgroundColor: STRIP,
-        fontSize: 22,
-      },
-      h('div', { display: 'block', color: MUTED }, 'Jamie Thingelstad'),
-      h('div', { display: 'block', marginLeft: 28, fontWeight: 600, color: INK }, site.label),
-      h('div', { display: 'block', marginLeft: 'auto', fontWeight: 500, color: MUTED }, site.host),
-    ),
+    band(site),
   );
 }
