@@ -163,6 +163,60 @@ for Another Thing podcast episodes… we need that one too").
   (`drawn`, `none`, `skipped`, `failed`), `photoMs` and `drawMs` on a drawn
   card.
 
+## Card design
+
+What every card shares, so a new site's card reads as one of the set (the
+2026-10-25 design pass; the canvas at
+claude.ai/artifact/TF23AaDQfNUH4WibFtdZpb holds the proposals and what was
+passed over). A new layout follows these; a change to one of them is Jamie's
+call, shown on a canvas first.
+
+- **Dark, always.** Black (`#16161a`), a site's own ground, or a photo
+  darkened under the words; words in white. No white cards.
+- **The band closes every card**: `band(site)` via `darkCard`, `#0e0e12`, the
+  owner's name, the site's label and its host. The label's colour is the
+  site's `mark`: its dark-mode `--jt-*-text` value in `shared/tokens.css` (the
+  strip's dark-mode colours), or none for the light ink `#ececf0`.
+- **Kicker, bar, headline.** The kicker (date, issue or episode number,
+  categories) is `kicker()`: 20px, weight 700, letter-spaced small capitals.
+  Then `bar()`, a 56 x 5 bar in white or the site's light accent. Then the
+  headline, always through `headline()`, which balances its lines with
+  `breakLines` and falls back to a clamp only when it can't.
+- **One mark of the site's own**: Weekly Thing's W (logo in the kicker, large
+  and faint with no cover), Another Thing's three dots (the crimson one the
+  play button), the saved link's host, very large and faint. A new site gets
+  one, drawn from its own logo or favicon, never a stock icon.
+- **Type**: Inter Tight 800 for headlines, Inter for the rest. Only Inter
+  400, 500 and 600 and Inter Tight 700 and 800 are loaded (`FONTS` in
+  `src/render.mjs`), so an Inter weight of 700 (the kickers) draws as 600;
+  load a weight before designing with it. No italics on sans-serif type
+  (thingelstad.com AGENTS.md).
+- **Words**: only what the page publishes as its h-entry, and on Linking
+  Things only Jamie's own notes. No photo of Jamie, no running totals that
+  change by the day (Jamie: "that number changes all the time"; it would also
+  break the page's `v`). Counts that belong to the thing itself, like an
+  issue's links, are fine, as pills.
+- **Photos**: a wide photo goes under the words (`OVERLAY`, Jamie's three
+  settings), a square or tall one stands beside them, a screenshot runs off
+  the corner in a frame. A photo card is a JPEG under 1 MB.
+
+What Satori does differently from a browser, found the hard way:
+
+- Every element with more than one child needs `display: 'flex'`; `h()` and
+  `tree()` build them. Text sits in `display: 'block'`
+  leaves.
+- No `gap`; use margins. `position: 'absolute'` with `top`/`left`/`right`,
+  `borderRadius` with `overflow: 'hidden'`, `boxShadow`, `objectFit` and
+  linear gradients all work (the current layouts use each).
+- `textWrap: 'balance'` misbreaks under a `lineClamp` (it balances for one
+  line more than it keeps), hence `breakLines`.
+- Its underline runs through descenders, and `textDecorationSkipInk: 'auto'`
+  chops it into pieces: underline a line with a `borderBottom` rule instead
+  (`headline(..., { rule })`).
+- It breaks no word: a word wider than its line is cut, hence `fitSize`.
+- A Satori `lineClamp` drops a decoration on the clamped line, so a title
+  that must keep its underline is cut with `clip` before it is drawn.
+
 ## Adding a site
 
 A site joins in two places, its own pages and here, in this order (the card
@@ -174,9 +228,14 @@ maker ships first, so the page never names a card it can't draw):
    (one in `src/card.mjs`, or a new one), its `mark`, and `photo(src)` naming
    the only photo host it may fetch (`() => null` for none). The site must be
    in `shared/sites.json` (`npm run sites:sync`); its origin and label come
-   from there. Tests for its paths and its reading, and previews of real
-   pages (`npm run render -- --root=<its dist>`) looked at before it merges.
-   Deploy.
+   from there. Its card follows "Card design" above: a proposal on a canvas
+   beside the site's current share image first when it needs a new layout.
+   Tests for its paths and its reading, a page for each of its layouts in
+   `tools/samples.json`, and previews of real pages (`npm run render --
+   --root=<its dist>`, then `npm run previews`) looked at before it merges.
+   Deploy. A site not yet in `shared/sites.json` (nnxyz, say) starts with its
+   entry there: its id, origin and label, and whether it joins the sites
+   strip, which is Jamie's call.
 2. **Its pages.** An h-entry with the fields its entry reads (the card reads
    nothing else), and in its `<head>`:
 
@@ -212,6 +271,11 @@ maker ships first, so the page never names a card it can't draw):
   overlay with other settings than `OVERLAY`, to compare them; the run says
   which posts went over their photo.
   Look at the cards before shipping a layout change.
+- `npm run previews` — draw the pages in `tools/samples.json`, one for each
+  way a card is drawn (every blog layout, an issue with and without a cover,
+  the newsletter's front page, an episode, saved links with and without a
+  note), into `.build/preview/` or `--out=<dir>`. Run it before and after a
+  layout change and look at every card, not only the one that changed.
 - `npm run plan` / `npm run deploy` — the `cards` stack (`infra/cards.json`),
   as the cloud-engineer identity from this Mac (the script refuses any other).
   Deploy uploads the zip by content key and executes a change set; then it
