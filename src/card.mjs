@@ -28,7 +28,8 @@
 // ("color: dark mode"). An episode's three dots stand large, the crimson one
 // its play button (Jamie: "we didn't get a design for Another Thing podcast
 // episodes… we need that one too"). Headlines are broken into even lines here (breakLines),
-// and counts are pills.
+// and counts are pills. Things 4 Good, the family's candle fundraiser, joined
+// the same day in its own site's type (t4gCard).
 
 export const WIDTH = 1200;
 export const HEIGHT = 630;
@@ -135,9 +136,10 @@ const TITLE = { fontFamily: 'Inter Tight', fontWeight: 800, lineHeight: 1.02, le
 /** A headline in its even lines, one block each, or one clamped block.
  * rule underlines each line with a bar of that colour, under its descenders,
  * where Satori's own underline runs through them; the clamped block falls
- * back to that underline. */
-function headline(text, style, { width, lines, rule }) {
-  const broken = breakLines(text, { size: style.fontSize, width, most: lines });
+ * back to that underline. em is the face's average advance, for a face
+ * narrower than Inter Tight. */
+function headline(text, style, { width, lines, rule, em }) {
+  const broken = breakLines(text, { size: style.fontSize, width, most: lines, em });
   const thickness = Math.max(4, Math.round(style.fontSize / 16));
   if (!broken) {
     const underline = rule ? { textDecoration: 'underline', textDecorationColor: rule, textDecorationThickness: thickness, textDecorationSkipInk: 'none' } : {};
@@ -681,6 +683,92 @@ function linkCard(post, { site }) {
   return darkCard(backdrop, over(top, words), site, LINKS.ground);
 }
 
+// Things 4 Good, as its site reads (2026-10-25, the canvas at
+// claude.ai/artifact/7knUfs7P2AEjjcnTrDLrea, direction B): a candle photo
+// under warm dark, the page's eyebrow in candlelight capitals beside the
+// site's candle, a marigold bar, the heading in Newsreader with its accent
+// in the site's pale pine italic, a line in Hanken Grotesk, and the sale's
+// facts as pills. Its own faces, since the site's are; the band is Inter, as
+// on every card. A page whose photo can't be had keeps its words on the warm
+// ground.
+const T4G = {
+  ground: '#1c140e',
+  shade: (alpha) => `rgba(22,15,9,${alpha})`,
+  eyebrow: '#f6c48a',
+  marigold: '#ee8b26',
+  pine: '#9fdcc6',
+  cream: '#fffaf2',
+  soft: 'rgba(255,248,236,0.84)',
+};
+// The site's favicon candle (its jar and flame), without its cream tile.
+const T4G_CANDLE = svg(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="13 4 38 53"><circle cx="32" cy="38" r="17" fill="#EE8B26"/><circle cx="32" cy="38" r="11" fill="#C9701A"/><path d="M32 6c7 7 10 13 10 19 0 7-5 12-10 12S22 32 22 25c0-6 3-12 10-19Z" fill="#18876F"/><path d="M32 12c4 5 6 9 6 13 0 4-3 7-6 7s-6-3-6-7c0-4 2-8 6-13Z" fill="#FBE3C2"/></svg>',
+);
+const SERIF = { fontFamily: 'Newsreader', fontWeight: 500, lineHeight: 1.02, letterSpacing: '-0.02em' };
+
+function t4gCard(post, { site, photo }) {
+  const width = 940;
+  const heading = post.headline || post.title;
+  const accent = post.accent ?? '';
+  const facts = post.facts ?? [];
+  // Smaller when the heading runs long. Newsreader runs narrower than Inter
+  // Tight, about 0.5em a character, so its lines are broken at 0.52.
+  const longest = Math.max(heading.length, accent.length);
+  const size = fitSize(accent ? (longest <= 22 ? 84 : 72) : heading.length <= 30 ? 84 : heading.length <= 56 ? 72 : 60, heading, width, 0.56);
+  const backdrop = photo
+    ? [
+        img(photo.src, { ...FILL, objectFit: 'cover', objectPosition: 'center' }),
+        h('div', {
+          ...FILL,
+          display: 'flex',
+          backgroundImage: `linear-gradient(90deg, ${T4G.shade(0.95)} 0%, ${T4G.shade(0.86)} 40%, ${T4G.shade(0.35)} 72%, ${T4G.shade(0.15)} 100%)`,
+        }),
+        h('div', {
+          ...FILL,
+          display: 'flex',
+          backgroundImage: `linear-gradient(180deg, ${T4G.shade(0.55)} 0%, ${T4G.shade(0)} 28%, ${T4G.shade(0)} 62%, ${T4G.shade(0.7)} 100%)`,
+        }),
+      ]
+    : [h('div', { ...FILL, display: 'flex', backgroundImage: 'radial-gradient(circle at 88% 92%, rgba(238,139,38,0.34) 0%, rgba(238,139,38,0.12) 30%, rgba(28,20,14,0) 58%)' })];
+  const fact = (text) =>
+    h(
+      'div',
+      {
+        display: 'flex',
+        marginRight: 10,
+        padding: '8px 18px',
+        borderRadius: 999,
+        backgroundColor: 'rgba(255,250,242,0.10)',
+        border: '1px solid rgba(255,250,242,0.20)',
+        fontSize: 20,
+        fontWeight: 600,
+        color: T4G.cream,
+      },
+      text,
+    );
+  return darkCard(
+    backdrop,
+    over(
+      kicker(post.kicker, T4G.eyebrow, T4G_CANDLE),
+      tree('div', { display: 'flex', flexDirection: 'column', width }, [
+        bar(T4G.marigold),
+        headline(heading, { ...SERIF, fontSize: size }, { width, lines: accent ? 2 : 3, em: 0.52 }),
+        accent && h('div', { display: 'block', ...SERIF, fontSize: size, lineHeight: 1.04, fontStyle: 'italic', color: T4G.pine, lineClamp: 1 }, accent),
+        post.text &&
+          h(
+            'div',
+            { display: 'block', marginTop: 20, maxWidth: 760, fontFamily: 'Hanken Grotesk', fontWeight: 500, fontSize: 26, lineHeight: 1.42, color: T4G.soft, lineClamp: 3 },
+            excerpt(post.text, 170),
+          ),
+        facts.length > 0 && tree('div', { display: 'flex', marginTop: 24, textShadow: 'none' }, facts.slice(0, 4).map(fact)),
+      ]),
+      { color: T4G.cream, textShadow: photo ? '0 2px 16px rgba(10,6,3,0.45)' : 'none', padding: `46px ${PAD}px 46px ${PAD}px` },
+    ),
+    site,
+    T4G.ground,
+  );
+}
+
 // The layouts a site's entry names (sites.mjs).
 const LAYOUTS = {
   post: postCard,
@@ -688,6 +776,7 @@ const LAYOUTS = {
     overCover(post, { site, photo, meta, counts: countParts(post.counts), top: rule.top, mark: W_LOGO, accent: WT.light }),
   episode: episodeCard,
   link: linkCard,
+  t4g: t4gCard,
 };
 
 /** The element tree for a post's card. photo is fetchPhoto's result or null;

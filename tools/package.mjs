@@ -25,13 +25,12 @@ const sha256 = (data) => createHash('sha256').update(data).digest('hex');
 
 /** resvg's WebAssembly, the fonts and the emoji, as zip entries. */
 export async function assets() {
-  const fontDir = (file) =>
-    path.join(ROOT, 'node_modules/@fontsource', file.startsWith('inter-tight') ? 'inter-tight' : 'inter', 'files', file);
+  const fontDir = ({ pkg, file }) => path.join(ROOT, 'node_modules/@fontsource', pkg, 'files', file);
   const emojiDir = path.join(ROOT, 'node_modules/@twemoji/svg');
   const emoji = (await fs.readdir(emojiDir)).filter((file) => file.endsWith('.svg'));
   return [
     { name: 'resvg.wasm', data: await fs.readFile(path.join(ROOT, 'node_modules/@resvg/resvg-wasm/index_bg.wasm')) },
-    ...(await Promise.all(FONTS.map(async ({ file }) => ({ name: `fonts/${file}`, data: await fs.readFile(fontDir(file)) })))),
+    ...(await Promise.all(FONTS.map(async (font) => ({ name: `fonts/${font.file}`, data: await fs.readFile(fontDir(font)) })))),
     ...(await Promise.all(emoji.map(async (file) => ({ name: `emoji/${file}`, data: await fs.readFile(path.join(emojiDir, file)) })))),
   ];
 }

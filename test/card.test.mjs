@@ -50,6 +50,19 @@ const HOME = {
   counts: { issues: 353, links: 6510 },
 };
 
+// Things 4 Good's front page, as sites.mjs reads it.
+const T4G_HOME = {
+  title: 'Hand-poured candles, 100% for good.',
+  kicker: '6th annual fall fundraiser',
+  headline: 'Hand-poured candles,',
+  accent: '100% for good.',
+  text: '',
+  facts: ['Nov 7–8, 2026', 'Minneapolis', '$25 a candle'],
+  published: null,
+  categories: [],
+  photo: null,
+};
+
 const LINK = {
   title: 'Mandelnaut — Making Fractal Wallpapers',
   text: 'I love the Mandelbrot fractal.',
@@ -87,6 +100,8 @@ test('every kind of card draws a 1200 x 630 PNG', async () => {
     [{ ...LINK, text: '', issues: [] }, { site: SITES.links, photo: null }],
     [HOME, { site: SITES.weekly, photo: { src: DOT } }],
     [HOME, { site: SITES.weekly, photo: null }],
+    [T4G_HOME, { site: SITES.t4g, photo: null }],
+    [{ ...T4G_HOME, headline: 'Where the good has gone.', accent: '', facts: [], text: 'Every nonprofit we have supported since 2021.' }, { site: SITES.t4g, photo: null }],
   ]) {
     const png = await render(cardFor(post, opts), dir);
     assert.deepEqual(png.subarray(0, 8), PNG);
@@ -330,4 +345,28 @@ test('a screenshot runs off the corner of the card, framed, beside the words', (
   assert.match(words, /"borderRadius":16/);
   // A screenshot of unknown size fills the height above the band.
   assert.match(JSON.stringify(cardFor(post, { site: SITES.www, photo: { src: DOT, screenshot: true } })), /"width":700,"height":562/);
+});
+
+test('a Things 4 Good card reads as its site: candle, serif heading, pale pine accent, facts and the family', () => {
+  const tree = cardFor(T4G_HOME, { site: SITES.t4g, photo: { src: DOT, width: 1200, height: 562 } });
+  const words = JSON.stringify(tree);
+  assert.deepEqual(texts(tree), [
+    '6TH ANNUAL FALL FUNDRAISER',
+    'Hand-poured candles,',
+    '100% for good.',
+    'Nov 7–8, 2026',
+    'Minneapolis',
+    '$25 a candle',
+    'The Thingelstad Family',
+    'Things 4 Good',
+    'things4good.xyz',
+  ]);
+  assert.match(words, /"fontFamily":"Newsreader"/);
+  assert.match(words, /"fontStyle":"italic","color":"#9fdcc6"/);
+  assert.match(words, /"color":"#f2a65a"},"children":"Things 4 Good"/);
+  assert.match(words, /"backgroundColor":"#1c140e"/);
+  // A line under the heading, in the site's grotesk; no photo, no photo drawn.
+  const plain = cardFor({ ...T4G_HOME, accent: '', facts: [], text: 'Everything about the candles.' }, { site: SITES.t4g, photo: null });
+  assert.match(JSON.stringify(plain), /"fontFamily":"Hanken Grotesk"/);
+  assert.ok(!JSON.stringify(plain).includes('"type":"img","props":{"src":"data:image/png'));
 });

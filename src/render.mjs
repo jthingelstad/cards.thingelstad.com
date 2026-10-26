@@ -9,9 +9,11 @@
 // smaller and sharper there.
 //
 // The fonts are static Inter (400, 500, 600) and Inter Tight (700, 800) from
-// Fontsource 5.3.0, the release the sites' shared/fonts come from. Satori
-// reads WOFF but not WOFF2 or variable fonts, so the card carries its own
-// static copies (tools/package.mjs puts them beside the bundle as fonts/).
+// Fontsource 5.3.0, the release the sites' shared/fonts come from, and for
+// Things 4 Good's cards its own faces: Newsreader 500 (upright and italic) and
+// Hanken Grotesk 500 (2026-10-25). Satori reads WOFF but not WOFF2 or variable
+// fonts, so the card carries its own static copies (tools/package.mjs puts
+// them beside the bundle as fonts/).
 //
 // Those fonts have no emoji, so Satori asks for each one and gets Twemoji's
 // SVG (@twemoji/svg 15.0.0, jdecked's Twemoji, graphics CC-BY 4.0), drawn as
@@ -23,14 +25,18 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { HEIGHT, WIDTH } from './card.mjs';
 
+// [name, weight, Fontsource package, style]; the package names the files.
 export const FONTS = [
   ['Inter', 400, 'inter'],
   ['Inter', 500, 'inter'],
   ['Inter', 600, 'inter'],
   ['Inter Tight', 700, 'inter-tight'],
   ['Inter Tight', 800, 'inter-tight'],
-].flatMap(([name, weight, file]) =>
-  ['latin', 'latin-ext'].map((subset) => ({ name, weight, file: `${file}-${subset}-${weight}-normal.woff` })),
+  ['Newsreader', 500, 'newsreader'],
+  ['Newsreader', 500, 'newsreader', 'italic'],
+  ['Hanken Grotesk', 500, 'hanken-grotesk'],
+].flatMap(([name, weight, pkg, style = 'normal']) =>
+  ['latin', 'latin-ext'].map((subset) => ({ name, weight, style, pkg, file: `${pkg}-${subset}-${weight}-${style}.woff` })),
 );
 
 const ZWJ = 0x200d;
@@ -84,7 +90,7 @@ export function prepare(dir) {
       ...FONTS.map((font) => fs.readFile(path.join(dir, 'fonts', font.file))),
     ]);
     await initWasm(wasm);
-    return FONTS.map((font, i) => ({ name: font.name, weight: font.weight, style: 'normal', data: fonts[i] }));
+    return FONTS.map((font, i) => ({ name: font.name, weight: font.weight, style: font.style, data: fonts[i] }));
   })();
   ready.catch(() => {
     ready = undefined;
