@@ -92,6 +92,22 @@ for Another Thing podcast episodes… we need that one too").
   line Satori clamps loses its underline. No photo yet: the linked page's own
   `og:image` is a later step (Jamie: fine "if it sticks to the metadata"),
   not built.
+- **A Things 4 Good page** (2026-10-25, the canvas at
+  claude.ai/artifact/7knUfs7P2AEjjcnTrDLrea; Jamie: "Approved: build Things 4
+  Good cards on cards.thingelstad.com with direction B, owner "The Thingelstad
+  Family", the candle photos as shown, no totals on Numbers, not in the sites
+  strip") reads as the site does: a candle photo under a warm dark (`#1c140e`),
+  the page's eyebrow (`p-kicker`) in candlelight capitals beside the site's
+  favicon candle, a marigold bar, the heading (`p-name`) in Newsreader with
+  its last words (`p-accent`, "100% for good.") in the site's pale pine
+  italic, a line under it (`p-summary`) in Hanken Grotesk, and the sale's
+  facts (`p-fact`) as pills. The photo (`u-featured`) is one the site cuts to
+  the card's photo area and serves from its own `/images/cards/`, the only
+  photos fetched for it. The band names the family, not Jamie (the entry's
+  `owner`). Each page publishes these as `<data>` elements in an h-entry
+  that `base.njk` writes from the page's `card` front matter; the front
+  page's facts come from the site's own sale dates and price, and no card
+  carries a running total.
 - The blog reads its own words, never a `p-summary`. The site's label in the
   band takes its sites-strip colour.
 - **A blog photo post** sets its words in white over its photo, the way an
@@ -189,7 +205,10 @@ call, shown on a canvas first.
 - **Type**: Inter Tight 800 for headlines, Inter for the rest. Only Inter
   400, 500 and 600 and Inter Tight 700 and 800 are loaded (`FONTS` in
   `src/render.mjs`), so an Inter weight of 700 (the kickers) draws as 600;
-  load a weight before designing with it. No italics on sans-serif type
+  load a weight before designing with it. Things 4 Good, which isn't one of
+  the strip sites and has its own type, draws its headings in Newsreader 500
+  (and its italic) and its line in Hanken Grotesk 500, loaded for it; its
+  band is Inter, as on every card. No italics on sans-serif type
   (thingelstad.com AGENTS.md).
 - **Words**: only what the page publishes as its h-entry, and on Linking
   Things only Jamie's own notes. No photo of Jamie, no running totals that
@@ -222,7 +241,8 @@ What Satori does differently from a browser, found the hard way:
 A site joins in two places, its own pages and here, in this order (the card
 maker ships first, so the page never names a card it can't draw):
 
-1. **Here.** Its entry in `src/sites.mjs`: `page(rest)` for the paths its
+1. **Here.** Its entry in `src/sites.mjs` (its id, from `shared/sites.json`,
+   is a lowercase letter then letters or digits: `t4g`): `page(rest)` for the paths its
    cards take (`/<id>` then the page's own path, `.png` for its trailing
    `.html` or `/`), `read(p)` for what its h-entry gives the card, a `layout`
    (one in `src/card.mjs`, or a new one), its `mark`, and `photo(src)` naming

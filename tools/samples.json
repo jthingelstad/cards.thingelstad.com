@@ -12,6 +12,8 @@
     { "url": "https://another.thingelstad.com/2025/10/05/how-do-you-start-a.html", "shows": "another: an episode" },
     { "url": "https://links.thingelstad.xyz/links/11ad6e13661a/", "shows": "links: a saved link with Jamie's note and an issue" },
     { "url": "https://links.thingelstad.xyz/links/a247e5eef435/", "shows": "links: a saved link, no note" },
-    { "url": "https://links.thingelstad.xyz/links/2ca5ff97f513/", "shows": "links: a long title on three lines" }
+    { "url": "https://links.thingelstad.xyz/links/2ca5ff97f513/", "shows": "links: a long title on three lines" },
+    { "url": "https://things4good.xyz/", "shows": "t4g: the front page over its candle photo, with an accent and the sale's facts" },
+    { "url": "https://things4good.xyz/impact/", "shows": "t4g: a page with a line under its heading" }
   ]
 }

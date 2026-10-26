@@ -33,6 +33,12 @@ test('a card path names a saved link', () => {
   });
 });
 
+test('a card path names a Things 4 Good page', () => {
+  assert.deepEqual(postFor('/t4g/index.png'), { site: 't4g', url: 'https://things4good.xyz/' });
+  assert.deepEqual(postFor('/t4g/impact.png'), { site: 't4g', url: 'https://things4good.xyz/impact/' });
+  assert.deepEqual(postFor('/t4g/maker-night.png'), { site: 't4g', url: 'https://things4good.xyz/maker-night/' });
+});
+
 test('anything else is not a card', () => {
   for (const path of [
     '/',
@@ -53,6 +59,12 @@ test('anything else is not a card', () => {
     '/links/links/DEC34BE50CEF.png',
     '/links/links/dec34be50cef/index.png',
     '/links/hosts/github.com.png',
+    '/t4g/impact/index.png',
+    '/t4g/Impact.png',
+    '/t4g/../impact.png',
+    '/t4g/images/cards/home.png',
+    '/T4G/impact.png',
+    '/4g/impact.png',
   ])
     assert.equal(postFor(path), null, path);
 });
@@ -228,4 +240,38 @@ test("a saved link reads its title, host, day and issues, and only Jamie's own n
   const bare = readPost(record({ issues: [], note: '' }), LINK);
   assert.equal(bare.text, '');
   assert.deepEqual(bare.issues, []);
+});
+
+// A Things 4 Good page, its card's words in data elements as base.njk writes them.
+const T4G = { site: 't4g', url: 'https://things4good.xyz/' };
+const t4gPage = ({ name = 'Hand-poured candles, 100% for good.', accent = '100% for good.', summary = '', photo = 'https://things4good.xyz/images/cards/home.jpg', facts = ['Nov 7–8, 2026', 'Minneapolis', '$25 a candle'] } = {}) => `<!DOCTYPE html>
+<html><head><meta property="og:image" content="https://cards.thingelstad.com/t4g/index.png?v=111a4a8aae"></head>
+<body><main><h1>Something else</h1>
+<div class="h-entry">
+  <data class="p-kicker" value="6th annual fall fundraiser"></data>
+  <data class="p-name" value="${name}"></data>
+  ${accent ? `<data class="p-accent" value="${accent}"></data>` : ''}
+  ${summary ? `<data class="p-summary" value="${summary}"></data>` : ''}
+  <data class="u-featured" value="${photo}"></data>
+  ${facts.map((fact) => `<data class="p-fact" value="${fact}"></data>`).join('')}
+</div></main></body></html>`;
+
+test('a Things 4 Good page reads its eyebrow, heading and accent, line, photo and facts', () => {
+  const post = readPost(t4gPage(), T4G.url);
+  assert.equal(post.kicker, '6th annual fall fundraiser');
+  assert.equal(post.title, 'Hand-poured candles, 100% for good.');
+  assert.equal(post.headline, 'Hand-poured candles,');
+  assert.equal(post.accent, '100% for good.');
+  assert.equal(post.text, '');
+  assert.equal(post.photo, 'https://things4good.xyz/images/cards/home.jpg');
+  assert.deepEqual(post.facts, ['Nov 7–8, 2026', 'Minneapolis', '$25 a candle']);
+  assert.equal(post.card, 'https://cards.thingelstad.com/t4g/index.png?v=111a4a8aae');
+  const plain = readPost(t4gPage({ name: 'Where the good has gone.', accent: '', summary: 'Every nonprofit.', facts: [] }), T4G.url);
+  assert.deepEqual([plain.headline, plain.accent, plain.text, plain.facts], ['Where the good has gone.', '', 'Every nonprofit.', []]);
+  // An accent that doesn't end the heading is no accent.
+  const odd = readPost(t4gPage({ accent: 'for good' }), T4G.url);
+  assert.deepEqual([odd.headline, odd.accent], ['Hand-poured candles, 100% for good.', '']);
+  // Only a photo cut for the card, on the site itself.
+  for (const photo of ['https://things4good.xyz/images/candles.jpg', 'https://example.com/images/cards/home.jpg', 'https://things4good.xyz/images/cards/../x.jpg'])
+    assert.equal(readPost(t4gPage({ photo }), T4G.url).photo, null, photo);
 });

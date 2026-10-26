@@ -30,7 +30,7 @@ export const CARDS = 'https://cards.thingelstad.com';
 
 /** The post a card path names, or null when the path is not a card. */
 export function postFor(path) {
-  const match = /^\/([a-z]+)\/(.+)\.png$/.exec(path);
+  const match = /^\/([a-z][a-z0-9]*)\/(.+)\.png$/.exec(path);
   const site = match && Object.hasOwn(SITES, match[1]) ? SITES[match[1]] : null;
   const page = site?.page(match[2]);
   if (!page) return null;

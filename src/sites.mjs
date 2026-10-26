@@ -33,6 +33,9 @@ const DATED = /^(\d{4}\/\d{2}\/\d{2}\/[A-Za-z0-9_-]+)$/;
 const ISSUE = /^archive\/(\d{1,4}(?:-[a-z]+)?)$/;
 // A saved link's id: the first 12 hex of the md5 of its URL as saved.
 const LINK = /^links\/[0-9a-f]{12}$/;
+// A Things 4 Good page (/impact/), and a photo cut for its card.
+const T4G_PAGE = /^[a-z0-9-]+$/;
+const T4G_PHOTO = /^https:\/\/things4good\.xyz\/images\/cards\/[a-z0-9-]+\.jpe?g$/;
 
 /** A dated post's page: /2026/10/15/the-nnxyz-rooms.html. */
 const dated = (rest) => (DATED.test(rest) ? { path: `/${rest}.html` } : null);
@@ -134,6 +137,33 @@ const ENTRIES = {
       issues: (p.issue ?? []).map((issue) => words([issue])).filter(Boolean),
     }),
     photo: () => null,
+  },
+  // Things 4 Good, the family's candle fundraiser (2026-10-25; Jamie:
+  // "direction B, owner "The Thingelstad Family", the candle photos as shown,
+  // no totals on Numbers, not in the sites strip"). Each page's h-entry gives
+  // the eyebrow over its heading (p-kicker), the heading (p-name), the words
+  // at its end set apart (p-accent, "100% for good."), a line under it
+  // (p-summary), a candle photo already cut to the card (u-featured, from
+  // the site's own /images/cards/) and the sale's facts (p-fact) as pills.
+  t4g: {
+    owner: 'The Thingelstad Family',
+    mark: '#f2a65a',
+    layout: 't4g',
+    page: (rest) => (rest === 'index' ? { path: '/' } : T4G_PAGE.test(rest) ? { path: `/${rest}/` } : null),
+    read(p) {
+      const name = words(p.name);
+      const accent = words(p.accent);
+      const featured = first(p.featured) ?? '';
+      return {
+        kicker: words(p.kicker),
+        headline: accent && name.endsWith(accent) ? name.slice(0, -accent.length).trim() : name,
+        accent: name.endsWith(accent) ? accent : '',
+        text: words(p.summary),
+        facts: (p.fact ?? []).map((fact) => words([fact])).filter(Boolean),
+        photo: T4G_PHOTO.test(featured) ? featured : null,
+      };
+    },
+    photo: (src) => (T4G_PHOTO.test(src) ? src : null),
   },
 };
 
