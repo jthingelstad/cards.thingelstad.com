@@ -20,30 +20,19 @@ import path from 'node:path';
 import { cardFor, OVERLAY, overPhoto } from '../src/card.mjs';
 import { fetchPhoto, fetchPost, postFor, readPost } from '../src/post.mjs';
 import { render } from '../src/render.mjs';
-import { SITES, siteAt } from '../src/sites.mjs';
+import { SITES } from '../src/sites.mjs';
+import { pathFor, readSamples } from './compare.mjs';
 import { OUT, stageAssets } from './package.mjs';
 
 const args = process.argv.slice(2);
 const out = args.find((a) => a.startsWith('--out='))?.slice(6) ?? path.join(OUT, 'preview');
 const root = args.find((a) => a.startsWith('--root='))?.slice(7);
 const overlay = JSON.parse(args.find((a) => a.startsWith('--overlay='))?.slice(10) ?? '{}');
-const samples = args.includes('--samples')
-  ? JSON.parse(await fs.readFile(new URL('./samples.json', import.meta.url), 'utf8')).samples.map((sample) => sample.url)
-  : [];
+const samples = args.includes('--samples') ? await readSamples() : [];
 const targets = [...samples, ...args.filter((a) => !a.startsWith('--'))];
 if (!targets.length) {
   console.error('usage: node tools/render.mjs <post URL or card path>... [--samples] [--out=<dir>] [--root=<dir>] [--overlay=<json>]');
   process.exit(2);
-}
-
-// A page's address as its card path: /www/..., /weekly/archive/<n>, /another/...
-function pathFor(url) {
-  const { pathname } = new URL(url);
-  const site = siteAt(url)?.id;
-  if (!site) return url;
-  // The newsletter's front page is its own card, /weekly/index.png.
-  if (pathname === '/') return `/${site}/index.png`;
-  return `/${site}${pathname.replace(/\.html$/, '').replace(/\/$/, '')}.png`;
 }
 
 const dir = await stageAssets();

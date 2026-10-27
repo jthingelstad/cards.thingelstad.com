@@ -300,9 +300,20 @@ maker ships first, so the page never names a card it can't draw):
   as the cloud-engineer identity from this Mac (the script refuses any other).
   Deploy uploads the zip by content key and executes a change set; then it
   reads `/health` through CloudFront until it reports the new key, and clears
-  the whole cache (`/*`) for that key so every card is drawn again by the code
-  now live. The invalidation is keyed on the code key, so an unchanged deploy
-  or a rerun clears nothing twice. A cleared cache is drawn back on demand.
+  the cached cards of only the sites whose cards now draw differently
+  (2026-10-27; Jamie: "only purge the cache when we know that the outcome is
+  different", after crawlers drew about 18,000 cards in one night).
+  `tools/compare.mjs` draws every page in `tools/samples.json` with the
+  package the cache was drawn by and with the new one; a site whose samples
+  come out the same byte for byte stays cached, and one that differs (twice
+  running), fails to draw, or has no sample is cleared (`/<site>/*`, or `/*`
+  when every site is). `cache/drawn-by.json` in the code bucket names the
+  package the cache was drawn by; deploy writes it only once the clearing is
+  done, so a rerun after a failed deploy compares from the same package and
+  clears what the first run missed. Plan prints what apply would clear. The
+  samples are the whole test, so a change that shows only on a page no
+  sample is like (CJK text, say) isn't seen: add a sample for every new way a
+  card is drawn, or deploy with `npm run deploy -- --clear-all`.
 - `npm run certificate` — the `cards-certificate` stack, printing the ACM
   validation record. DNS is at Namecheap and records there are Jamie's to add.
   Once the certificate is ISSUED, the next deploy gives the distribution its
@@ -315,6 +326,13 @@ names.
 Alarms (draw failures, function errors, and throttles: a request turned away
 at the ceiling never reaches the function, so only the throttle alarm sees it)
 go to `weekly-thing-librarian-alarms`, the queue-only topic the other sites use.
+The throttle alarm wants 50 or more turned away in each of three quarter
+hours running (2026-10-27; Jamie: "I don't think a single request turned
+away shoudl be an alarm"). Crawlers reach the ceiling as a matter of course
+(AhrefsBot sweeping the blog's photo cards held it at 10 for three and a
+half hours on 2026-10-27, about $0.45 of drawing over two days), and a
+turned-away request is not cached, so the crawler gets the card on its next
+try.
 None of them sees past Lambda, so DNS, the certificate and CloudFront are
 watched from outside: Jamie's updown.io check (2026-10-24; not
 Tinylytics, which has no page views here to count). `/health` is the path to

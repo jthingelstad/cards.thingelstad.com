@@ -5,6 +5,8 @@
 //   node tools/deploy.mjs apply        package, upload the zip if it is new, and
 //                                      execute the change set; then read /health
 //                                      through CloudFront until it reports the key
+//                                      and clear the cards that now draw differently
+//   node tools/deploy.mjs apply --clear-all   the same, clearing every card
 //   node tools/deploy.mjs certificate  create the cards-certificate stack and print
 //                                      the ACM validation record for Namecheap
 //
@@ -18,12 +20,18 @@
 // The zip's key, code/<sha256>.zip, hashes the files, not the zip's bytes, so
 // an apply with nothing changed in the code or the template has nothing to do.
 //
-// Once /health reports the key, apply clears the whole cache (one /*
-// invalidation, edges and Origin Shield both) for that key, so every card is
-// drawn again by the code now live; otherwise a layout change would reach
-// only cards not yet drawn. The invalidation's CallerReference is the key, so
-// CloudFront makes one per key: an apply of unchanged code, or a rerun after a
-// failed one, gets the existing invalidation back and clears nothing again.
+// A drawn card is kept a year, so a layout change reaches only cards not yet
+// drawn unless the cache is cleared; but clearing it throws away every card
+// the crawlers made, to draw the same cards again (2026-10-27: AhrefsBot and
+// Amazonbot drew about 18,000 overnight). So apply clears only the sites whose
+// cards changed: tools/compare.mjs draws tools/samples.json with the package
+// the cache was drawn by and with the new one, and each site whose samples
+// differ is cleared (/<site>/*, edges and Origin Shield both), or /* when
+// they all do. cache/drawn-by.json in the code bucket names the package the
+// cache was drawn by, written only once the clearing is done, so a rerun
+// after a failed apply compares from the same package again and clears what
+// the first run did not. Without that record, the live package is taken as
+// the one. Plan prints what apply would clear.
 import { CloudFrontClient, CreateInvalidationCommand, waitUntilInvalidationCompleted } from '@aws-sdk/client-cloudfront';
 import {
   CloudFormationClient,
@@ -39,12 +47,14 @@ import {
   waitUntilStackUpdateComplete,
 } from '@aws-sdk/client-cloudformation';
 import { ACMClient, DescribeCertificateCommand } from '@aws-sdk/client-acm';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { changedSites, load, readSamples } from './compare.mjs';
 import { packageCards } from './package.mjs';
+import { SITES } from '../src/sites.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG = path.join(ROOT, 'infra/deployment.json');
@@ -52,7 +62,9 @@ const ROLE = ':assumed-role/ProjectsCloudEngineer/';
 
 const mode = process.argv[2];
 if (!['plan', 'apply', 'certificate'].includes(mode))
-  throw new Error('Usage: node tools/deploy.mjs plan|apply|certificate');
+  throw new Error('Usage: node tools/deploy.mjs plan|apply [--clear-all]|certificate');
+const clearAll = process.argv.includes('--clear-all');
+const RECORD = 'cache/drawn-by.json';
 
 const config = JSON.parse(await fs.readFile(CONFIG, 'utf8'));
 const settings = { region: config.region, maxAttempts: 5 };
@@ -169,6 +181,32 @@ async function certificate() {
   throw new Error(`${StackName}: ACM gave no validation record in five minutes`);
 }
 
+/** The package the cache was drawn by, from its record or else the live one. */
+async function drawnBy(s3, Bucket, live) {
+  try {
+    const { Body } = await s3.send(new GetObjectCommand({ Bucket, Key: RECORD }));
+    return JSON.parse(await Body.transformToString()).code;
+  } catch (error) {
+    if (error.name === 'NoSuchKey') return live;
+    throw error;
+  }
+}
+
+/** The paths to clear for a move from one package to another: [] for none. */
+async function toClear(s3, Bucket, from, manifest) {
+  if (clearAll) return { paths: ['/*'], reasons: { all: '--clear-all' } };
+  if (!from) return { paths: ['/*'], reasons: { all: 'no package on record' } };
+  if (from === manifest.key) return { paths: [], reasons: {} };
+  const { Body } = await s3.send(new GetObjectCommand({ Bucket, Key: from }));
+  const before = await load(Buffer.from(await Body.transformToByteArray()));
+  const after = await load(await fs.readFile(manifest.path));
+  const sites = Object.keys(SITES);
+  const changed = await changedSites(before, after, await readSamples(), sites);
+  const reasons = Object.fromEntries(changed);
+  if (changed.size === sites.length) return { paths: ['/*'], reasons };
+  return { paths: [...changed.keys()].map((site) => `/${site}/*`), reasons };
+}
+
 async function apply() {
   const StackName = config.stacks.cards;
   const manifest = await packageCards();
@@ -189,13 +227,22 @@ async function apply() {
   }
 
   const Bucket = output(stack, 'CodeBucket');
+  const s3 = new S3Client(settings);
   let Key = parameter(stack, 'CodeKey');
   let Version = parameter(stack, 'CodeVersion');
+  const cachedBy = await drawnBy(s3, Bucket, Key);
+  const clear = await toClear(s3, Bucket, cachedBy, manifest);
+  console.log(
+    clear.paths.length
+      ? `Cards drawn by ${cachedBy || 'none'}: clear ${clear.paths.join(' ')}`
+      : 'Cards: every sample draws the same; nothing to clear',
+  );
+  for (const [site, reason] of Object.entries(clear.reasons)) console.log(`  ${site}: ${reason}`);
   if (Key !== manifest.key) {
     if (mode === 'plan') {
       console.log(`Code: ${Key || 'none'} -> ${manifest.key} (uploaded at apply)`);
     } else {
-      const put = await new S3Client(settings).send(
+      const put = await s3.send(
         new PutObjectCommand({
           Bucket,
           Key: manifest.key,
@@ -252,21 +299,34 @@ async function apply() {
   }
   if (reported !== Key) throw new Error(`${health} reports ${reported}, not ${Key}`);
 
-  const cloudfront = new CloudFrontClient(settings);
-  const { Invalidation } = await cloudfront.send(
-    new CreateInvalidationCommand({
-      DistributionId: live.distributionId,
-      InvalidationBatch: { CallerReference: Key, Paths: { Quantity: 1, Items: ['/*'] } },
-    }),
-  );
-  if (Invalidation.Status !== 'Completed') {
-    console.log(`Clearing the cache for ${Key} (invalidation ${Invalidation.Id})`);
+  let cleared = null;
+  if (clear.paths.length) {
+    const cloudfront = new CloudFrontClient(settings);
+    const { Invalidation } = await cloudfront.send(
+      new CreateInvalidationCommand({
+        DistributionId: live.distributionId,
+        InvalidationBatch: {
+          CallerReference: `${Key}@${Date.now()}`,
+          Paths: { Quantity: clear.paths.length, Items: clear.paths },
+        },
+      }),
+    );
+    console.log(`Clearing ${clear.paths.join(' ')} for ${Key} (invalidation ${Invalidation.Id})`);
     await waitUntilInvalidationCompleted(
       { client: cloudfront, maxWaitTime: 900 },
       { DistributionId: live.distributionId, Id: Invalidation.Id },
     );
+    cleared = { id: Invalidation.Id, paths: clear.paths };
   }
-  console.log(JSON.stringify({ stack: StackName, code: Key, cleared: Invalidation.Id, ...live }, null, 2));
+  await s3.send(
+    new PutObjectCommand({
+      Bucket,
+      Key: RECORD,
+      Body: `${JSON.stringify({ code: Key, at: new Date().toISOString(), cleared })}\n`,
+      ContentType: 'application/json',
+    }),
+  );
+  console.log(JSON.stringify({ stack: StackName, code: Key, cleared, ...live }, null, 2));
 }
 
 await (mode === 'certificate' ? certificate() : apply());

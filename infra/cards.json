@@ -575,7 +575,7 @@
         "AlarmName": {
           "Fn::Sub": "${AWS::StackName}-throttles"
         },
-        "AlarmDescription": "The card maker turned requests away at its concurrency ceiling, so some cards were not drawn.",
+        "AlarmDescription": "The card maker turned 50 or more requests a quarter hour away at its concurrency ceiling for 45 minutes. A crawler being turned away now and then is the ceiling working; this is a sustained queue.",
         "Namespace": "AWS/Lambda",
         "MetricName": "Throttles",
         "Dimensions": [
@@ -587,9 +587,10 @@
           }
         ],
         "Statistic": "Sum",
-        "Period": 300,
-        "EvaluationPeriods": 1,
-        "Threshold": 1,
+        "Period": 900,
+        "EvaluationPeriods": 3,
+        "DatapointsToAlarm": 3,
+        "Threshold": 50,
         "ComparisonOperator": "GreaterThanOrEqualToThreshold",
         "TreatMissingData": "notBreaching",
         "AlarmActions": [
