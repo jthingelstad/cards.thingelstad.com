@@ -31,7 +31,8 @@
 // cache was drawn by, written only once the clearing is done, so a rerun
 // after a failed apply compares from the same package again and clears what
 // the first run did not. Without that record, the live package is taken as
-// the one. Plan prints what apply would clear.
+// the one, and apply records it before changing anything. Plan prints what
+// apply would clear.
 import { CloudFrontClient, CreateInvalidationCommand, waitUntilInvalidationCompleted } from '@aws-sdk/client-cloudfront';
 import {
   CloudFormationClient,
@@ -181,15 +182,23 @@ async function certificate() {
   throw new Error(`${StackName}: ACM gave no validation record in five minutes`);
 }
 
-/** The package the cache was drawn by, from its record or else the live one. */
+const record = (s3, Bucket, body) =>
+  s3.send(new PutObjectCommand({ Bucket, Key: RECORD, Body: `${JSON.stringify(body)}\n`, ContentType: 'application/json' }));
+
+/**
+ * The package the cache was drawn by, from its record or else the live one.
+ * Apply writes the live one down before it changes anything, so a run that
+ * fails after the stack update still compares from it next time.
+ */
 async function drawnBy(s3, Bucket, live) {
   try {
     const { Body } = await s3.send(new GetObjectCommand({ Bucket, Key: RECORD }));
     return JSON.parse(await Body.transformToString()).code;
   } catch (error) {
-    if (error.name === 'NoSuchKey') return live;
-    throw error;
+    if (error.name !== 'NoSuchKey') throw error;
   }
+  if (mode === 'apply' && live) await record(s3, Bucket, { code: live, at: new Date().toISOString(), cleared: null });
+  return live;
 }
 
 /** The paths to clear for a move from one package to another: [] for none. */
@@ -318,14 +327,7 @@ async function apply() {
     );
     cleared = { id: Invalidation.Id, paths: clear.paths };
   }
-  await s3.send(
-    new PutObjectCommand({
-      Bucket,
-      Key: RECORD,
-      Body: `${JSON.stringify({ code: Key, at: new Date().toISOString(), cleared })}\n`,
-      ContentType: 'application/json',
-    }),
-  );
+  await record(s3, Bucket, { code: Key, at: new Date().toISOString(), cleared });
   console.log(JSON.stringify({ stack: StackName, code: Key, cleared, ...live }, null, 2));
 }
 
