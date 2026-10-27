@@ -318,5 +318,13 @@ go to `weekly-thing-librarian-alarms`, the queue-only topic the other sites use.
 None of them sees past Lambda, so DNS, the certificate and CloudFront are
 watched from outside: Jamie's updown.io check (2026-10-24; not
 Tinylytics, which has no page views here to count). `/health` is the path to
-check, never `/`, which is a 404 by design. Keep the ACM validation CNAME
+check, never `/`, which is a 404 by design.
+
+CloudFront's access logs (2026-10-26, Jamie: "can you add similar logging
+to all 10 of the ones that log nothing?") go to the `/cards/web-access` log
+group, kept 14 days, through the `cards-web-access` delivery, the same shape
+as Linking Things: the request's path, status, bytes, timing, cache result,
+edge, protocol and user agent, never the client IP or the query string.
+
+Keep the ACM validation CNAME
 (`_599951081a9a6beba0c85c6a673beb51.cards`) at Namecheap: renewal needs it.
