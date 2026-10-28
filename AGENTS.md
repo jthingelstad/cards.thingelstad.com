@@ -340,8 +340,8 @@ check, never `/`, which is a 404 by design.
 
 CloudFront's access logs (2026-10-26, Jamie: "can you add similar logging
 to all 10 of the ones that log nothing?") go to the `/cards/web-access` log
-group, kept 14 days, through the `cards-web-access` delivery, the same shape
-as Linking Things: the request's path, status, bytes, timing, cache result,
+group, kept 24 months (731 days; Jamie, 2026-10-28), through the
+`cards-web-access` delivery, the same shape as Linking Things: the request's path, status, bytes, timing, cache result,
 edge, protocol and user agent, never the client IP or the query string.
 
 Keep the ACM validation CNAME

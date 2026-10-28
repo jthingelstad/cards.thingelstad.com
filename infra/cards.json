@@ -412,7 +412,7 @@
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
         "LogGroupName": "/cards/web-access",
-        "RetentionInDays": 14
+        "RetentionInDays": 731
       }
     },
     "AccessLogSource": {
