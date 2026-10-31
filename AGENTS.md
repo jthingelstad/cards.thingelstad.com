@@ -121,7 +121,10 @@ for Another Thing podcast episodes… we need that one too").
   minutes in the function, so a crawler sweeping 7,000 site pages fetches it
   once a while; a map that can't be had or isn't one throws, so that card is
   kept five minutes, drawn without the sky. A card over the sky is a JPEG
-  (a field of small stars runs to 700 KB as PNG), 120 to 150 KB.
+  (a field of small stars runs to 700 KB as PNG), 120 to 150 KB. Its samples
+  in `tools/samples.json` are the front page, an issue, a finished year, a
+  site, a topic and a day, so a change to the sky layout is compared before
+  the links cache is cleared.
 - **A Things 4 Good page** (2026-10-25, the canvas at
   claude.ai/artifact/7knUfs7P2AEjjcnTrDLrea; Jamie: "Approved: build Things 4
   Good cards on cards.thingelstad.com with direction B, owner "The Thingelstad
