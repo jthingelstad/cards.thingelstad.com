@@ -15,13 +15,16 @@
 //              is no card
 //   read(p)    the site's part of a card, from the page's h-entry
 //              properties: { text, photo, counts?, episode?, host?, issues? }
-//   home(p)    the card of its front page, from the h-feed there
-//              (only a site whose page() names one)
+//   home(p, entries)  the card of its front page, from the h-feed there,
+//              and that h-feed's items (only a site whose page() names one;
+//              Linking Things names one for each lens page too)
 //   photo(src) where a photo its page names is fetched from, or null for
 //              one it never draws: the only photo hosts ever fetched
 //   homeLayout the card.mjs layout of its front page (the Weekly Thing's
 //              when none is named)
 //   svg        true when the site may name an SVG (a map) as its photo
+//   json       true when its photo is data its layout draws from (Linking
+//              Things' sky map, as { json })
 import { parseFragment } from 'parse5';
 import shared from './shared/sites.json' with { type: 'json' };
 import { count, first, headlineLines, markup, plainText, words } from './read.mjs';
@@ -36,6 +39,14 @@ const DATED = /^(\d{4}\/\d{2}\/\d{2}\/[A-Za-z0-9_-]+)$/;
 const ISSUE = /^archive\/(\d{1,4}(?:-[a-z]+)?)$/;
 // A saved link's id: the first 12 hex of the md5 of its URL as saved.
 const LINK = /^links\/[0-9a-f]{12}$/;
+// A Linking Things lens page: an issue, a year, a site, a kind, a topic, the
+// topics, a day, and /sky/ (the front page is index).
+const LENS = /^(?:issues\/\d{1,4}(?:-[a-z]+)?|years\/\d{4}|hosts\/[a-z0-9-]+(?:\.[a-z0-9-]+)+|kinds\/[a-z]+|topics(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)?|on\/\d{2}-\d{2}|sky)$/;
+// The sky every lens card is drawn over: the whole sky as the front page
+// first shows it, projected onto the card when the site builds.
+const SKY_MAP = 'https://links.thingelstad.xyz/sky/card.json';
+// A record's address, the lit stars a lens page lists.
+const RECORD = /^https:\/\/links\.thingelstad\.xyz\/links\/([0-9a-f]{12})\/$/;
 // A Things 4 Good page (/impact/), and a photo cut for its card.
 const T4G_PAGE = /^[a-z0-9-]+$/;
 const T4G_PHOTO = /^https:\/\/things4good\.xyz\/images\/cards\/[a-z0-9-]+\.jpe?g$/;
@@ -151,16 +162,44 @@ const ENTRIES = {
   // "jamie"; Jamie, 2026-10-25: "Jamie-voice notes only"). A quotation from
   // the page, a mixed note or an agent's summary is never on the card, nor a
   // note on a page that doesn't say whose it is. No photo.
+  //
+  // Its lens pages (2026-10-31; Jamie: "Approved: build Linking Things sky
+  // cards (a sky layout on cards.thingelstad.com, then og:image on every lens
+  // page), counts on issues and finished years only, the whole-sky card on
+  // the front page and /sky/") are read from their h-feed: the kicker
+  // (p-kicker), the card's name (p-headline), a count only where the number
+  // is fixed (p-link-count), the sky map (u-sky), and the links the page
+  // lists (its h-entries' u-url), which the card lights. The map comes as a
+  // photo does, from the one address it may.
   links: {
     layout: 'link',
-    page: (rest) => (LINK.test(rest) ? { path: `/${rest}/` } : null),
+    homeLayout: 'sky',
+    json: true,
+    page(rest) {
+      if (LINK.test(rest)) return { path: `/${rest}/` };
+      if (rest === 'index') return { path: '/', home: true };
+      return LENS.test(rest) ? { path: `/${rest}/`, home: true } : null;
+    },
     read: (p) => ({
       text: words(p.voice) === 'jamie' ? plainText(markup(p.content)) : '',
       photo: null,
       host: words(p.host),
       issues: (p.issue ?? []).map((issue) => words([issue])).filter(Boolean),
     }),
-    photo: () => null,
+    home: (p, entries = []) => ({
+      title: words(p.headline),
+      kicker: words(p.kicker),
+      count: count(p['link-count']),
+      photo: first(p.sky) === SKY_MAP ? SKY_MAP : null,
+      lit: [
+        ...new Set(
+          entries.flatMap((entry) =>
+            entry.type?.includes('h-entry') ? (entry.properties.url ?? []).map((url) => RECORD.exec(url)?.[1]).filter(Boolean) : [],
+          ),
+        ),
+      ],
+    }),
+    photo: (src) => (src === SKY_MAP ? src : null),
   },
   // Things 4 Good, the family's candle fundraiser (2026-10-25; Jamie:
   // "direction B, owner "The Thingelstad Family", the candle photos as shown,
