@@ -1086,8 +1086,127 @@ function rsmHome(post, { site, photo }) {
   );
 }
 
+// Linking Things' lens pages (2026-10-31; Jamie: "Approved: build Linking
+// Things sky cards ... counts on issues and finished years only, the
+// whole-sky card on the front page and /sky/"): the sky the front page opens
+// on, every star where it stands there, the topics' glows under them, and
+// the stars the page lists lit in the gold the sky lights them in, the view
+// turned toward them as the lens turns. The words sit on the left over the
+// night, as the lens panel sits beside the sky: the page's kicker, a gold
+// bar, its name, and its count only where the number is fixed (an issue, a
+// finished year). The map is the site's /sky/card.json (sites.mjs, post.mjs).
+const SKY = { ground: '#04060c', gold: '#ffcf7a', pale: '#ffe2ad', soft: '#c3c9da' };
+const fixed = (n) => Math.round(n * 10) / 10;
+// Where the lit stars are framed: right of the words, inside the band.
+const SKY_BOX = [560, 48, 1150, 514];
+
+/** The lit stars' extent along one axis, all but the farthest few of a large
+ * set (three in a hundred each side), so one stray doesn't push the rest
+ * away. */
+function extent(values) {
+  const sorted = values.sort((a, b) => a - b);
+  const k = sorted.length > 40 ? Math.floor(sorted.length * 0.03) : 0;
+  return [sorted[k], sorted[sorted.length - 1 - k]];
+}
+
+/** The sky behind a lens card as one SVG image. map is the site's
+ * /sky/card.json: the stars as the front page first shows them, four numbers
+ * a star (x, y, brightness, warmth) in the order of map.ids, and each topic's
+ * glow ([x, y, r, colour]), all in a map.width x map.height card. lit is the
+ * stars to light, by index. The card takes in the lit stars, right of the
+ * words, from as near as four times closer to half again farther; with none
+ * lit it is the whole sky. A card is seen at about 500 pixels wide, so every
+ * star is drawn larger than the sky's own, and fewer lit stars larger still:
+ * a year's thousand would run together as a few do not. */
+export function skyField(map, lit) {
+  const { width, height } = map;
+  const n = map.ids.length;
+  const on = new Set(lit.filter((i) => Number.isInteger(i) && i >= 0 && i < n));
+  const xs = [...on].map((i) => map.stars[4 * i]);
+  const ys = [...on].map((i) => map.stars[4 * i + 1]);
+  const [x0, x1] = xs.length ? extent(xs) : [width * 0.45, width * 0.92];
+  const [y0, y1] = ys.length ? extent(ys) : [height * 0.04, height * 0.96];
+  const [bx0, by0, bx1, by1] = SKY_BOX;
+  const zoom = Math.min(4, Math.max(0.66, Math.min((bx1 - bx0) / Math.max(x1 - x0, 1), (by1 - by0) / Math.max(y1 - y0, 1))));
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+  const at = (x, y) => [fixed((x - cx) * zoom + (bx0 + bx1) / 2), fixed((y - cy) * zoom + (by0 + by1) / 2)];
+  const seen = (x, y, r) => x > -r && y > -r && x < width + r && y < height + r;
+  const colors = [...new Set(map.glows.map((g) => g[3]))];
+  const defs = colors.map(
+    (color, i) =>
+      `<radialGradient id="g${i}"><stop offset="0" stop-color="${color}" stop-opacity="0.11"/><stop offset="0.5" stop-color="${color}" stop-opacity="0.035"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient>`,
+  );
+  const glows = map.glows.flatMap(([x, y, r, color]) => {
+    const [gx, gy] = at(x, y);
+    const gr = fixed(r * 0.6 * zoom);
+    return seen(gx, gy, gr) ? [`<circle cx="${gx}" cy="${gy}" r="${gr}" fill="url(#g${colors.indexOf(color)})"/>`] : [];
+  });
+  const [core, halo, glow] =
+    on.size <= 12 ? [4.2, 12, 0.65] : on.size <= 60 ? [3.4, 9, 0.55] : on.size <= 300 ? [2.8, 7, 0.45] : [2.1, 5, 0.32];
+  const dust = [];
+  const halos = [];
+  const golds = [];
+  for (let i = 0; i < n; i++) {
+    const [x, y] = at(map.stars[4 * i], map.stars[4 * i + 1]);
+    if (!seen(x, y, 12)) continue;
+    if (on.has(i)) {
+      halos.push(`<circle cx="${x}" cy="${y}" r="${halo}"/>`);
+      golds.push(`<circle cx="${x}" cy="${y}" r="${core}"/>`);
+      continue;
+    }
+    // The sky's own star colour (sky-gl.ts): brightness, a little warmer or cooler.
+    const b = map.stars[4 * i + 2];
+    const warm = map.stars[4 * i + 3];
+    const rgb = [b * (0.78 + 0.22 * warm), b * (0.85 + 0.05 * warm), b * (1 - 0.22 * warm)].map((c) => Math.round(Math.min(Math.max(c, 0), 1) * 255));
+    dust.push(`<circle cx="${x}" cy="${y}" r="1.15" fill="rgb(${rgb})" fill-opacity="${fixed(0.45 + 0.4 * b)}"/>`);
+  }
+  return svg(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+      `<defs>${defs.join('')}<filter id="halo" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.5"/></filter></defs>` +
+      `<rect width="${width}" height="${height}" fill="${SKY.ground}"/>${glows.join('')}${dust.join('')}` +
+      `<g fill="${SKY.gold}" fill-opacity="${glow}" filter="url(#halo)">${halos.join('')}</g><g fill="${SKY.pale}">${golds.join('')}</g></svg>`,
+  );
+}
+
+// Each map's ids by index, worked out once for every card drawn over it.
+const indexes = new WeakMap();
+const indexOf = (map) => {
+  if (!indexes.has(map)) indexes.set(map, new Map(map.ids.map((id, i) => [id, i])));
+  return indexes.get(map);
+};
+
+/** A lens page's card: photo is the sky map (post.mjs, fetchPhoto), or null
+ * when it couldn't be had, and then the words stand on the night alone. */
+function skyCard(post, { site, photo }) {
+  const width = 620;
+  const title = post.title || site.label;
+  const size = fitSize(title.length <= 12 ? 104 : title.length <= 24 ? 84 : title.length <= 44 ? 68 : 58, title, width, 0.6);
+  const map = photo?.json ?? null;
+  const index = map && indexOf(map);
+  const lit = map ? (post.lit ?? []).map((id) => index.get(id)).filter((i) => i !== undefined) : [];
+  const backdrop = [
+    map && img(skyField(map, lit), { ...FILL }),
+    h('div', { ...FILL, display: 'flex', backgroundImage: 'linear-gradient(90deg, rgba(4,6,12,0.94) 0%, rgba(4,6,12,0.82) 38%, rgba(4,6,12,0.3) 58%, rgba(4,6,12,0) 72%)' }),
+  ].filter(Boolean);
+  return darkCard(
+    backdrop,
+    over(
+      kicker(post.kicker || 'Linking Things', SKY.soft),
+      tree('div', { display: 'flex', flexDirection: 'column', width }, [
+        bar(SKY.gold),
+        headline(title, { ...TITLE, fontSize: size }, { width, lines: 3 }),
+        post.count > 0 && tree('div', { display: 'flex', marginTop: 26 }, [pill([post.count, post.count === 1 ? 'link' : 'links'])]),
+      ]),
+    ),
+    site,
+    SKY.ground,
+  );
+}
+
 // The layouts a site's entry names (sites.mjs).
 const LAYOUTS = {
+  sky: skyCard,
   post: postCard,
   issue: (post, { site, photo, meta, rule }) =>
     overCover(post, { site, photo, meta, counts: countParts(post.counts), top: rule.top, mark: W_LOGO, accent: WT.light }),

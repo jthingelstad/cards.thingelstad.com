@@ -34,8 +34,12 @@ link cards with Jamie-voice notes only"), set by the site's `src/lib/card.ts`:
 
     https://cards.thingelstad.com/links/links/dec34be50cef.png?v=<hash>
 
-names https://links.thingelstad.xyz/links/dec34be50cef/. Every other page
-there keeps the site's one share image.
+names https://links.thingelstad.xyz/links/dec34be50cef/. Its lens pages
+have sky cards (2026-10-31, below), and its About, Search, Newest and Stats
+keep the site's one share image:
+
+    https://cards.thingelstad.com/links/issues/354.png?v=<hash>
+    https://cards.thingelstad.com/links/index.png?v=<hash>
 
 Then richer (Jamie, 2026-10-25: "make it rich and inviting and equal to the
 quality of the thing it is previewing"): every Weekly Thing and Another Thing
@@ -92,6 +96,32 @@ for Another Thing podcast episodes… we need that one too").
   line Satori clamps loses its underline. No photo yet: the linked page's own
   `og:image` is a later step (Jamie: fine "if it sticks to the metadata"),
   not built.
+- **A Linking Things lens page** (2026-10-31; the previews at
+  claude.ai/artifact/LDdzAms1CcQ6vA86HwuPtg; Jamie: "Approved: build Linking
+  Things sky cards (a sky layout on cards.thingelstad.com, then og:image on
+  every lens page), counts on issues and finished years only, the whole-sky
+  card on the front page and /sky/") is drawn over the sky the site's front
+  page opens on: every star where it stands there, the topics' glows under
+  them, and the links the page lists lit in the sky's gold, the view turned
+  toward them (`skyField`: a 2D zoom that frames the lit stars right of the
+  words, from four times closer to half again farther, three in a hundred
+  trimmed each side of a large set). Fewer lit stars draw larger, so a year's
+  thousand don't run together. The words sit on the left over the night: the
+  page's kicker (`p-kicker`), a gold bar, its name (`p-headline`), and a
+  count pill only where the number is fixed (`p-link-count`, which the site
+  sets on an issue and a finished year only). The pages are an issue, a year,
+  a site (`hosts/`), a kind, a topic, the topics, a day (`on/`), `/sky/` and
+  the front page (`index`), each read from its page's h-feed (`home(p,
+  entries)` in `src/sites.mjs`); the lit links are its h-entries' `u-url`
+  record addresses. The sky is the site's `/sky/card.json` (`u-sky`, the only
+  address it may come from), the stars projected onto the card as the front
+  page first shows them when the site builds: `{ width, height, ids, stars:
+  [x, y, brightness, warmth, ...], glows: [[x, y, r, colour], ...] }`. It
+  rides the photo slot (`json: true`), is checked (`isSkyMap`) and kept ten
+  minutes in the function, so a crawler sweeping 7,000 site pages fetches it
+  once a while; a map that can't be had or isn't one throws, so that card is
+  kept five minutes, drawn without the sky. A card over the sky is a JPEG
+  (a field of small stars runs to 700 KB as PNG), 120 to 150 KB.
 - **A Things 4 Good page** (2026-10-25, the canvas at
   claude.ai/artifact/7knUfs7P2AEjjcnTrDLrea; Jamie: "Approved: build Things 4
   Good cards on cards.thingelstad.com with direction B, owner "The Thingelstad
@@ -176,7 +206,9 @@ for Another Thing podcast episodes… we need that one too").
   that redirects off its site has no card), and reads no page past 2 MB or
   photo past 10 MB. `src/read.mjs` has the reading helpers every site shares.
 - `src/card.mjs` is the layouts, as the element trees Satori draws: `post`
-  (the blog), `issue`, `episode`, and the newsletter's front page.
+  (the blog), `issue`, `episode`, `link`, `sky` (Linking Things' lens
+  pages), Things 4 Good's, Road Sign Math's, and the newsletter's front
+  page.
 - `src/render.mjs` draws it: Satori to SVG, resvg (WebAssembly) to pixels,
   then a JPEG for a card with a photo and a PNG for the rest (2026-10-25). A
   photo card as PNG ran 0.6 to 1.5 MB, past Bluesky's 1,000,000-byte limit

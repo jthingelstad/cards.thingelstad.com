@@ -9,6 +9,7 @@
 //   /links/links/0a1b2c3d4e5f.png            https://links.thingelstad.xyz/links/0a1b2c3d4e5f/
 //   /rsm/signs/osceola.png                   https://roadsignmath.xyz/signs/osceola
 //   /rsm/players/jamie.png                   https://roadsignmath.xyz/players/jamie (an h-card)
+//   /links/issues/354.png                    https://links.thingelstad.xyz/issues/354/ (a lens page: its h-feed)
 //
 // The page is fetched and read as an h-entry, the microformats every post,
 // issue and episode carries: p-name (titled posts only; a micropost has
@@ -66,7 +67,7 @@ export function readPost(html, url, { home = false, item = 'h-entry', kind } = {
   if (home) {
     const feed = site.home && findItem(items, 'h-feed');
     if (!feed) throw new Error(`no h-feed at ${url}`);
-    return { url, site: site.id, home: true, published: null, categories: [], ...site.home(feed.properties), card };
+    return { url, site: site.id, home: true, published: null, categories: [], ...site.home(feed.properties, feed.children ?? []), card };
   }
   const entry = item === 'h-entry' ? findItem(items, item) : pageItem(items, item, url);
   if (!entry) throw new Error(`no ${item} at ${url}`);
@@ -186,6 +187,53 @@ export async function fetchPost(url, { home = false, item, kind } = {}) {
 
 const TYPES = new Set(['image/jpeg', 'image/png', 'image/gif']);
 const SVG = 'image/svg+xml';
+const JSON_TYPE = 'application/json';
+
+// Linking Things' sky map, kept ten minutes: every lens card is drawn over
+// the same one, so a crawler sweeping its 7,000 site pages fetches it once a
+// while, never once a card. The map is part of the site, not a photo a post
+// may lack, so one that can't be had or isn't one throws: that card is kept
+// only briefly (handler.mjs) and drawn again over the sky once it is back.
+const KEEP = 10 * 60 * 1000;
+const maps = new Map();
+
+/** True when map is a sky map as card.mjs's skyField reads it. */
+export function isSkyMap(map) {
+  const n = Array.isArray(map?.ids) ? map.ids.length : -1;
+  return (
+    n >= 0 &&
+    Number.isFinite(map.width) &&
+    Number.isFinite(map.height) &&
+    map.width > 0 &&
+    map.height > 0 &&
+    map.ids.every((id) => typeof id === 'string') &&
+    Array.isArray(map.stars) &&
+    map.stars.length === 4 * n &&
+    map.stars.every(Number.isFinite) &&
+    Array.isArray(map.glows) &&
+    map.glows.every(
+      (g) => Array.isArray(g) && g.length === 4 && g.slice(0, 3).every(Number.isFinite) && /^#[0-9a-f]{6}$/i.test(g[3]),
+    )
+  );
+}
+
+async function fetchMap(from) {
+  const kept = maps.get(from);
+  if (kept && Date.now() - kept.at < KEEP) return kept.map;
+  const response = await get(from, JSON_TYPE, PHOTO_LIMIT);
+  if (!response.body || response.type !== JSON_TYPE)
+    throw new Error(`${from}: HTTP ${response.status}${response.type ? ` ${response.type}` : ''}`);
+  let json;
+  try {
+    json = JSON.parse(response.body.toString('utf8'));
+  } catch {
+    throw new Error(`${from}: not JSON`);
+  }
+  if (!isSkyMap(json)) throw new Error(`${from}: not a sky map`);
+  const map = { json };
+  maps.set(from, { at: Date.now(), map });
+  return map;
+}
 
 /** A photo as a data URI the renderer can draw, or null when there is none
  * it can draw: no photo, one its site never draws, gone, too large, or a type
@@ -195,6 +243,8 @@ const SVG = 'image/svg+xml';
 export async function fetchPhoto(src, site) {
   const from = src ? site.photo(src) : null;
   if (!from) return null;
+  // Linking Things' sky (sites.mjs) is data the layout draws from: { json }.
+  if (site.json) return fetchMap(from);
   const response = await get(from, site.svg ? `${SVG},image/jpeg;q=0.9` : 'image/jpeg,image/png;q=0.9,image/gif;q=0.8', PHOTO_LIMIT);
   if (response.status === 429 || response.status >= 500) throw new Error(`${from}: HTTP ${response.status}`);
   // An SVG (Road Sign Math's map) is never drawn as it comes: its layout

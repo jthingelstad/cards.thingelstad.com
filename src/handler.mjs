@@ -6,6 +6,8 @@
 //   GET /weekly/archive/<n>.png               ... that Weekly Thing issue
 //   GET /another/<yyyy>/<mm>/<dd>/<slug>.png  ... that Another Thing episode
 //   GET /rsm/signs/<slug>.png              ... that Road Sign Math sign (players/<handle>, index too)
+//   GET /links/links/<id>.png              ... that Linking Things record (issues/<n>, years/<yyyy>
+//                                          and the other lens pages, index too, over the sky)
 //   GET /health                            the package this function runs
 //
 // A card is drawn only as its page names it: the page's og:image carries the
@@ -100,9 +102,10 @@ export async function handler(event) {
       state = 'failed';
     }
     const drawStart = Date.now();
-    // A card with a photo is a JPEG, kept under Bluesky's 1 MB; one of type
-    // and colour (and Road Sign Math's map, drawn from its shapes) stays PNG.
-    // Either is served at its .png path.
+    // A card with a photo is a JPEG, kept under Bluesky's 1 MB, and so is a
+    // Linking Things lens card over its sky (a field of small stars runs to
+    // 700 KB as PNG); one of type and colour (and Road Sign Math's map, drawn
+    // from its shapes) stays PNG. Either is served at its .png path.
     const format = photo && !photo.svg ? 'jpeg' : 'png';
     const image = await render(cardFor(post, { site, photo, kicker: target.kicker }), DIR, { format });
     log(200, {
