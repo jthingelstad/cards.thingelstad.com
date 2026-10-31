@@ -11,7 +11,8 @@
 // The fonts are static Inter (400, 500, 600) and Inter Tight (700, 800) from
 // Fontsource 5.3.0, the release the sites' shared/fonts come from, and for
 // Things 4 Good's cards its own faces: Newsreader 500 (upright and italic) and
-// Hanken Grotesk 500 (2026-10-25). Satori reads WOFF but not WOFF2 or variable
+// Hanken Grotesk 500 (2026-10-25), and for Road Sign Math's Overpass 700 and
+// 800 (2026-10-31). Satori reads WOFF but not WOFF2 or variable
 // fonts, so the card carries its own static copies (tools/package.mjs puts
 // them beside the bundle as fonts/).
 //
@@ -35,6 +36,8 @@ export const FONTS = [
   ['Newsreader', 500, 'newsreader'],
   ['Newsreader', 500, 'newsreader', 'italic'],
   ['Hanken Grotesk', 500, 'hanken-grotesk'],
+  ['Overpass', 700, 'overpass'],
+  ['Overpass', 800, 'overpass'],
 ].flatMap(([name, weight, pkg, style = 'normal']) =>
   ['latin', 'latin-ext'].map((subset) => ({ name, weight, style, pkg, file: `${pkg}-${subset}-${weight}-${style}.woff` })),
 );

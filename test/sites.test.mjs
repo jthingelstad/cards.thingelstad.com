@@ -12,13 +12,14 @@ test('each site takes its origin and label from shared/sites.json', () => {
       ['another', 'https://another.thingelstad.com', 'Podcast', 'another.thingelstad.com'],
       ['links', 'https://links.thingelstad.xyz', 'Links', 'links.thingelstad.xyz'],
       ['t4g', 'https://things4good.xyz', 'Things 4 Good', 'things4good.xyz'],
+      ['rsm', 'https://roadsignmath.xyz', 'Road Sign Math', 'roadsignmath.xyz'],
     ],
   );
   assert.equal(OWNER, 'Jamie Thingelstad');
   // Things 4 Good is the family's, and says so in its band.
   assert.deepEqual(
     Object.values(SITES).map((site) => site.owner),
-    [OWNER, OWNER, OWNER, OWNER, 'The Thingelstad Family'],
+    [OWNER, OWNER, OWNER, OWNER, 'The Thingelstad Family', OWNER],
   );
   assert.equal(siteAt('https://things4good.xyz/impact/'), SITES.t4g);
   assert.equal(siteAt('https://weekly.thingelstad.com/archive/353/'), SITES.weekly);

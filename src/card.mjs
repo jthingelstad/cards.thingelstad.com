@@ -31,6 +31,8 @@
 // and counts are pills. Things 4 Good, the family's candle fundraiser, joined
 // the same day in its own site's type (t4gCard).
 
+import { mathImage, mathSvg } from './math.mjs';
+
 export const WIDTH = 1200;
 export const HEIGHT = 630;
 
@@ -769,6 +771,321 @@ function t4gCard(post, { site, photo }) {
   );
 }
 
+// Road Sign Math (2026-10-31): a sign's photo edge to edge with its math over
+// it (Jamie: "the road sign image should be edge-to-edge, the solution (math)
+// should be MathJax rendered as an overlay on top of it"), a player's face or
+// letter, and Home's map with every pin. The site's own type (Overpass) and
+// its dark-mode colours: the sign plate's green, the pins' white ring and
+// the green ink words are set in. The math is drawn from the way's LaTeX by
+// MathJax, the version the site draws it with (src/math.mjs), and is the
+// way's text when its LaTeX can't be drawn.
+const RSM = {
+  ground: '#101713',
+  card: '#18221d',
+  land: '#2a3831',
+  green: '#006348',
+  ink: '#5cc395',
+  yellow: '#f2b300',
+  dark: '#18201c',
+  text: '#e8efeb',
+  soft: '#c3cec8',
+  shade: (alpha) => `rgba(8,14,11,${alpha})`,
+};
+const OVERPASS = { fontFamily: 'Overpass', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-0.01em' };
+
+// The site's logo, √(5 − 1) = 2 on a sign plate, as its layout.tsx draws it.
+const RSM_LOGO = (() => {
+  const math = mathSvg('\\sqrt{5 - 1} = 2');
+  const inner = math.markup.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '').replaceAll('currentColor', '#ffffff');
+  return svg(
+    '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 64 64">' +
+      '<rect width="64" height="64" rx="12" fill="#006348"/>' +
+      '<rect x="5.5" y="5.5" width="53" height="53" rx="8.5" fill="none" stroke="#fff" stroke-width="3"/>' +
+      `<svg x="11" y="22" width="42" height="20" viewBox="${math.box}">${inner}</svg></svg>`,
+  );
+})();
+
+/** How a sign card's math is set, for Jamie to choose (npm run render --
+ * --rsm=band|plate): 'plate', on the site's green sign plate floating over
+ * the photo, the way the site sets a way, or 'band', white over the photo
+ * darkened toward its foot. */
+export const RSM_SIGN = 'plate';
+
+/** The math's size: em pixels to the em, and no wider or taller than the
+ * room it has (a long way steps down to fit). */
+export function mathSize(math, { em, width, height }) {
+  const tall = (math.units / 1000) * em;
+  const k = Math.min(1, width / (tall * math.ratio), height / tall);
+  return { width: Math.round(tall * math.ratio * k), height: Math.round(tall * k) };
+}
+
+/** A way's math in color at em, or its text when its LaTeX can't be drawn. */
+function wayMath(post, color, { em, width, height, shadow = false }) {
+  const math = mathImage(post.tex, color, { shadow });
+  if (math) return img(math.src, mathSize(math, { em, width, height }));
+  const text = post.math || '';
+  return h('div', { display: 'block', ...OVERPASS, fontSize: fitSize(Math.min(em * 0.7, 76), text, width, 0.6), color, lineClamp: 2 }, text);
+}
+
+/** The words before a Road Sign Math headline: the logo and a line in
+ * small capitals. */
+const rsmKicker = (text, color) =>
+  tree('div', { display: 'flex', alignItems: 'center', fontFamily: 'Overpass', fontSize: 22, fontWeight: 700, letterSpacing: '0.12em', color }, [
+    img(RSM_LOGO, { width: 46, height: 46, marginRight: 16, borderRadius: 9 }),
+    h('div', { display: 'block', lineClamp: 1, paddingTop: 3 }, (text || 'Road Sign Math').toUpperCase()),
+  ]);
+
+/** The sign plate: the site's green with its white inner rule. */
+const plate = (child, { pad = '14px 26px', radius = 16, shadow = true } = {}) =>
+  h(
+    'div',
+    { display: 'flex', padding: 5, borderRadius: radius, backgroundColor: RSM.green, boxShadow: shadow ? '0 10px 34px rgba(0,0,0,0.45)' : 'none' },
+    h('div', { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: pad, borderRadius: radius - 5, border: '3px solid #ffffff', color: WHITE }, child),
+  );
+
+/** A fact on a Road Sign Math card: a number in Overpass and a word. */
+const rsmFact = ([n, word]) =>
+  h(
+    'div',
+    {
+      display: 'flex',
+      alignItems: 'center',
+      marginRight: 12,
+      padding: '6px 16px 4px',
+      borderRadius: 999,
+      backgroundColor: 'rgba(255,255,255,0.12)',
+      border: '1px solid rgba(255,255,255,0.22)',
+      fontFamily: 'Overpass',
+      fontSize: 22,
+      fontWeight: 700,
+      color: RSM.text,
+    },
+    n !== '' && h('div', { display: 'block', fontWeight: 800, marginRight: 8, color: WHITE }, String(n)),
+    h('div', { display: 'block' }, word),
+  );
+
+/** Parts in a row with a middle dot between them. Overpass draws U+00B7 with
+ * no advance, so in a " · " the dot sits on the space after it and reads
+ * "Jamie ·October". The dot here is Inter's, spaced by margin rather than by
+ * spaces, which Satori trims at the edge of a text node. A part may be a node,
+ * so one can shrink and clip while the others keep their width. */
+function dotted(parts, style) {
+  const items = parts.filter(Boolean).map((part) => (typeof part === 'string' ? h('div', { display: 'block', flexShrink: 0 }, part) : part));
+  const dot = () => h('div', { display: 'block', flexShrink: 0, fontFamily: 'Inter', fontWeight: 600, margin: '0 0.3em' }, '\u00b7');
+  return tree('div', { display: 'flex', alignItems: 'baseline', ...style }, items.flatMap((item, i) => (i ? [dot(), item] : [item])));
+}
+
+/** Who found a sign and when: "Found by Jamie and Tyler · October 22, 2023".
+ * A long list of finders is cut short; the date is not. */
+function foundLine(post, style) {
+  const finders = post.finders ?? [];
+  const who = finders.length < 2 ? (finders[0] ?? '') : `${finders.slice(0, -1).join(', ')} and ${finders.at(-1)}`;
+  return dotted([who && h('div', { display: 'block', flexShrink: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }, `Found by ${who}`), post.day], style);
+}
+
+/** The ways past the first: "+2 more ways". */
+const moreWays = (post) => (post.ways > 1 ? `+${post.ways - 1} more ${post.ways === 2 ? 'way' : 'ways'}` : '');
+
+// A sign: its photo fills the card, its top kept (the signs stand high in
+// the frame, the road runs under them), darkened at the top for the place
+// and at the foot for the math. Unsolved, its numbers stand on small plates
+// under "Can you solve it?".
+function rsmSign(post, { site, photo, rule }) {
+  const variant = rule.rsm ?? RSM_SIGN;
+  const width = WIDTH - 2 * PAD;
+  const solved = Boolean(post.tex || post.math);
+  const foot = variant === 'plate' ? 0.82 : 0.92;
+  const backdrop = photo
+    ? [
+        img(photo.src, { ...FILL, objectFit: 'cover', objectPosition: 'center 20%' }),
+        h('div', {
+          ...FILL,
+          display: 'flex',
+          backgroundImage: `linear-gradient(180deg, ${RSM.shade(0.62)} 0%, ${RSM.shade(0.18)} 16%, ${RSM.shade(0)} 26%, ${variant === 'plate' ? `${RSM.shade(0)} 52%, ${RSM.shade(0.4)} 66%` : `${RSM.shade(0.5)} 44%, ${RSM.shade(0.74)} 60%`}, ${RSM.shade(foot)} 100%)`,
+        }),
+      ]
+    : [h('div', { ...FILL, display: 'flex', backgroundImage: `radial-gradient(circle at 85% 20%, rgba(0,99,72,0.55) 0%, rgba(0,99,72,0.15) 40%, rgba(16,23,19,0) 70%)` })];
+  const more = moreWays(post);
+  const title = h('div', { display: 'block', ...OVERPASS, fontSize: 38, lineClamp: 1, color: WHITE }, post.title);
+  const found = foundLine(post, { fontFamily: 'Overpass', fontWeight: 700, fontSize: 24, color: RSM.soft, marginTop: 4 });
+  const tiles = tree(
+    'div',
+    { display: 'flex', alignItems: 'center' },
+    (post.numbers ?? []).slice(0, 8).map((n) =>
+      h('div', { display: 'flex', marginRight: 14 }, plate(h('div', { display: 'block', ...OVERPASS, fontSize: 52, lineHeight: 1, paddingTop: 6 }, n), { pad: '10px 22px', radius: 14 })),
+    ),
+  );
+  let math;
+  if (!solved)
+    math = tree('div', { display: 'flex', flexDirection: 'column' }, [
+      tiles,
+      h('div', { display: 'block', ...OVERPASS, fontSize: 64, marginTop: 22, color: WHITE }, 'Can you solve it?'),
+    ]);
+  else if (variant === 'plate') math = h('div', { display: 'flex' }, plate(wayMath(post, WHITE, { em: 96, width: width - 70, height: 124 }), { pad: '16px 28px' }));
+  else math = wayMath(post, WHITE, { em: 116, width, height: 150, shadow: Boolean(photo) });
+  return darkCard(
+    backdrop,
+    over(
+      rsmKicker(post.place, WHITE),
+      tree('div', { display: 'flex', flexDirection: 'column', width }, [
+        variant !== 'plate' && solved && h('div', { display: 'flex', marginBottom: 14 }, bar(RSM.ink)),
+        math,
+        tree('div', { display: 'flex', alignItems: 'flex-end', marginTop: solved ? 22 : 18 }, [
+          tree('div', { display: 'flex', flexDirection: 'column', flexGrow: 1, flexShrink: 1, minWidth: 0 }, [title, found]),
+          more && h('div', { display: 'flex', marginLeft: 20, marginBottom: 2, textShadow: 'none', flexShrink: 0 }, rsmFact(['', more])),
+        ]),
+      ]),
+      { textShadow: photo ? '0 2px 18px rgba(0,0,0,0.5)' : 'none', padding: `40px ${PAD}px 40px ${PAD}px` },
+    ),
+    site,
+    RSM.ground,
+  );
+}
+
+const AVATAR = 330;
+
+// A player: their profile photo, or their letter in their colour as the site
+// draws it, on a white ring, beside their name and what they have found.
+function rsmPlayer(post, { site, photo }) {
+  const width = WIDTH - 2 * PAD - AVATAR - 72;
+  const name = post.title || 'A player';
+  const letter = [...(name.trim() || '?')][0].toUpperCase();
+  const face = photo
+    ? img(photo.src, { width: AVATAR - 16, height: AVATAR - 16, borderRadius: (AVATAR - 16) / 2, objectFit: 'cover' })
+    : h(
+        'div',
+        {
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: AVATAR - 16,
+          height: AVATAR - 16,
+          borderRadius: (AVATAR - 16) / 2,
+          backgroundColor: post.color,
+          color: post.color.toLowerCase() === RSM.yellow ? RSM.dark : WHITE,
+          ...OVERPASS,
+          fontSize: 170,
+          lineHeight: 1,
+          boxSizing: 'border-box',
+          paddingTop: 22,
+        },
+        letter,
+      );
+  const facts = [
+    post.counts?.signs ? [number(post.counts.signs), post.counts.signs === 1 ? 'sign' : 'signs'] : null,
+    post.counts?.states ? [number(post.counts.states), post.counts.states === 1 ? 'state' : 'states'] : null,
+    post.since ? ['', `since ${post.since}`] : null,
+  ].filter(Boolean);
+  const size = fitSize(name.length <= 10 ? 104 : name.length <= 18 ? 84 : 64, name, width, 0.6);
+  return darkCard(
+    [h('div', { ...FILL, display: 'flex', backgroundImage: 'radial-gradient(circle at 18% 50%, rgba(0,99,72,0.55) 0%, rgba(0,99,72,0.16) 32%, rgba(16,23,19,0) 60%)' })],
+    tree('div', { ...FILL, display: 'flex', alignItems: 'center', boxSizing: 'border-box', padding: `0 ${PAD}px` }, [
+      h(
+        'div',
+        { display: 'flex', alignItems: 'center', justifyContent: 'center', width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: WHITE, flexShrink: 0, boxShadow: '0 14px 40px rgba(0,0,0,0.45)' },
+        face,
+      ),
+      tree('div', { display: 'flex', flexDirection: 'column', marginLeft: 72, width }, [
+        rsmKicker('Road Sign Math player', RSM.ink),
+        h('div', { display: 'flex', height: 26 }),
+        bar(RSM.ink),
+        headline(name, { ...OVERPASS, fontSize: size, lineHeight: 1.04, color: WHITE }, { width, lines: 2, em: 0.6 }),
+        facts.length > 0 && tree('div', { display: 'flex', marginTop: 26 }, facts.map(rsmFact)),
+      ]),
+    ]),
+    site,
+    RSM.ground,
+  );
+}
+
+// The map's shapes, from the site's own /us-map.svg: its land and its
+// state borders, path data only, drawn here in the card's colours.
+const PATH_DATA = /^[MmLlHhVvCcSsQqTtAaZz0-9eE.,\s-]+$/;
+export function mapPaths(markup) {
+  const d = (name) => {
+    const found = new RegExp(`<path class="${name}" d="([^"]+)"`).exec(markup ?? '')?.[1];
+    return found && PATH_DATA.test(found) ? found : null;
+  };
+  const land = d('l');
+  return land ? { land, borders: d('b') } : null;
+}
+
+const MAP = { width: 975, height: 610 };
+
+// Home: the map of the states with a pin for every sign (the site's pins:
+// its green, a white ring, the count on a pin for more than one), and the
+// site's name and hero line beside it.
+function rsmHome(post, { site, photo }) {
+  const paths = mapPaths(photo?.svg);
+  const mapWidth = 760;
+  const mapHeight = Math.round((mapWidth * MAP.height) / MAP.width);
+  const left = WIDTH - mapWidth - 30;
+  const top = Math.round((ABOVE - mapHeight) / 2) + 6;
+  const map = paths
+    ? svg(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${MAP.width} ${MAP.height}"><path fill="${RSM.land}" d="${paths.land}"/>` +
+          (paths.borders ? `<path fill="none" stroke="${RSM.ground}" stroke-width="1.4" stroke-linejoin="round" d="${paths.borders}"/>` : '') +
+          '</svg>',
+      )
+    : null;
+  const pins = (post.pins ?? []).map(({ x, y, n }) => {
+    const size = n > 1 ? 38 : 26;
+    return h(
+      'div',
+      {
+        position: 'absolute',
+        left: Math.round(left + (x / 100) * mapWidth - size / 2),
+        top: Math.round(top + (y / 100) * mapHeight - size / 2),
+        width: size,
+        height: size,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+        borderRadius: size / 2,
+        backgroundColor: RSM.green,
+        border: '3px solid #ffffff',
+        boxShadow: '0 3px 10px rgba(0,0,0,0.45)',
+        fontFamily: 'Overpass',
+        fontWeight: 800,
+        fontSize: 18,
+        paddingTop: 3,
+        color: WHITE,
+      },
+      n > 1 ? String(n) : '',
+    );
+  });
+  const words = post.text || 'Find a sign. Make the math true.';
+  const width = left - PAD - 10;
+  const counts = [
+    post.counts?.signs ? `${number(post.counts.signs)} signs` : '',
+    post.counts?.players ? `${number(post.counts.players)} players` : '',
+    post.counts?.states ? `${number(post.counts.states)} states` : '',
+  ].filter(Boolean);
+  return darkCard(
+    [
+      h('div', { ...FILL, display: 'flex', backgroundImage: 'radial-gradient(circle at 70% 55%, rgba(0,99,72,0.28) 0%, rgba(16,23,19,0) 60%)' }),
+      map && img(map, { position: 'absolute', left, top, width: mapWidth, height: mapHeight }),
+      ...pins,
+    ].filter(Boolean),
+    tree('div', { position: 'absolute', top: 0, left: 0, width: left, height: ABOVE, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxSizing: 'border-box', padding: `44px 0 44px ${PAD}px` }, [
+      h(
+        'div',
+        { display: 'flex', alignItems: 'center' },
+        img(RSM_LOGO, { width: 58, height: 58, marginRight: 16, borderRadius: 11 }),
+        h('div', { display: 'block', ...OVERPASS, fontSize: 34, paddingTop: 4 }, post.title || 'Road Sign Math'),
+      ),
+      tree('div', { display: 'flex', flexDirection: 'column', width }, [
+        post.kicker && h('div', { display: 'block', fontFamily: 'Overpass', fontWeight: 700, fontSize: 20, letterSpacing: '0.14em', color: RSM.ink, marginBottom: 14 }, post.kicker.toUpperCase()),
+        headline(words, { ...OVERPASS, fontSize: 60, lineHeight: 1.02, color: WHITE }, { width, lines: 4, em: 0.6 }),
+        counts.length > 0 && dotted(counts, { marginTop: 22, fontFamily: 'Overpass', fontWeight: 700, fontSize: 24, color: RSM.soft }),
+      ]),
+    ]),
+    site,
+    RSM.ground,
+  );
+}
+
 // The layouts a site's entry names (sites.mjs).
 const LAYOUTS = {
   post: postCard,
@@ -777,13 +1094,15 @@ const LAYOUTS = {
   episode: episodeCard,
   link: linkCard,
   t4g: t4gCard,
+  rsm: (post, args) => (post.kind === 'player' ? rsmPlayer(post, args) : rsmSign(post, args)),
+  rsmHome,
 };
 
 /** The element tree for a post's card. photo is fetchPhoto's result or null;
- * overlay changes OVERLAY, for a preview of another answer (npm run render
- * --overlay=...), never on the Lambda. */
+ * overlay changes OVERLAY (and rsm, RSM_SIGN), for a preview of another
+ * answer (npm run render --overlay=...), never on the Lambda. */
 export function cardFor(post, { site, photo, kicker: number, overlay }) {
-  if (post.home) return homeCard(post, { site, photo });
+  if (post.home) return (site.homeLayout ? LAYOUTS[site.homeLayout] : homeCard)(post, { site, photo });
   const layout = LAYOUTS[site.layout];
   if (!layout) throw new Error(`${site.id} names no layout here (${site.layout})`);
   // An early issue titled only with its date ("May 5, 2018") isn't dated twice.

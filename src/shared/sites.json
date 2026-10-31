@@ -137,6 +137,20 @@
       "feeds": {},
       "subscribe_url": "https://buttondown.com/things4good",
       "$comment": "Here for its share cards (cards.thingelstad.com, 2026-10-25). Left out of the sites strip by Jamie's call the same day. No feed, also Jamie's call; its updates are the Buttondown list."
+    },
+    {
+      "id": "rsm",
+      "name": "Road Sign Math",
+      "short_name": "Road Sign Math",
+      "strip_label": "Road Sign Math",
+      "url": "https://roadsignmath.xyz/",
+      "description": "A road trip game: find a road sign whose numbers make a true equation, photograph it and post the math. Every sign players have found, on a map.",
+      "kind": "game",
+      "in_publishing_system": false,
+      "in_sites_strip": false,
+      "feeds": {},
+      "subscribe_url": null,
+      "$comment": "Here for its share cards (cards.thingelstad.com, 2026-10-31): sign, player and Home cards. Not in the sites strip and not in the publishing system. Feeds are left empty here until the site's own feeds settle."
     }
   ]
 }
