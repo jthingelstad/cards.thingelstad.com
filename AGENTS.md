@@ -108,6 +108,33 @@ for Another Thing podcast episodes… we need that one too").
   that `base.njk` writes from the page's `card` front matter; the front
   page's facts come from the site's own sale dates and price, and no card
   carries a running total.
+- **A Road Sign Math page** (2026-10-31; Jamie: "the road sign image should
+  be edge-to-edge, the solution (math) should be MathJax rendered as an
+  overlay on top of it"). A sign (`/rsm/signs/<slug>.png`, an h-entry) is its
+  photo edge to edge, cropped from 20% down since signs stand high in the
+  frame, with the place (`p-location`) as the kicker beside the site's logo
+  (√(5 − 1) = 2 on its green plate), the first way's math drawn from its
+  LaTeX (`p-tex`) by MathJax 3.2.2, the version the site draws it with
+  (`src/math.mjs`), the sign's name, who found it and the day
+  (`p-finder`, `dt-published`, a bare day written as is), and "+N more ways"
+  past the first (`p-way-count`). Two ways to set the math, `RSM_SIGN`:
+  `plate`, on the site's green sign plate as the site sets a way (the
+  default), and `band`, white over the photo darkened toward its foot
+  (`npm run render -- --rsm=band`); which one ships is Jamie's pick. A long way
+  steps down to fit (`mathSize`); LaTeX MathJax can't draw falls back to the
+  way's text (`p-math`). An unsolved sign shows its numbers (`p-number`) on
+  small plates under "Can you solve it?". A player (`/rsm/players/<handle>.png`)
+  is read from the page's own h-card (the one whose `u-url` is the page):
+  their profile photo (`u-photo`) or their letter in their colour
+  (`p-avatar-color`, an ink letter on the yellow, as the site draws it) on a
+  white ring, their name, and signs, states and first year as pills. Home
+  (`/rsm/index.png`, an h-feed) is the site's map with a pin for each place
+  (`p-pin`, "x y signs", x and y in percent of the map) beside its name,
+  hero line and counts. The map is the site's own `/us-map.svg` (`u-map`):
+  only its land and border path data are taken (`mapPaths`) and drawn in the
+  site's dark colours, so that card stays PNG. Photos come only from
+  `https://roadsignmath.xyz/p/<id>/large.jpg`, the map only from that one
+  address. Type is the site's own Overpass (700 and 800); the band is Inter.
 - The blog reads its own words, never a `p-summary`. The site's label in the
   band takes its sites-strip colour.
 - **A blog photo post** sets its words in white over its photo, the way an
@@ -207,8 +234,9 @@ call, shown on a canvas first.
   `src/render.mjs`), so an Inter weight of 700 (the kickers) draws as 600;
   load a weight before designing with it. Things 4 Good, which isn't one of
   the strip sites and has its own type, draws its headings in Newsreader 500
-  (and its italic) and its line in Hanken Grotesk 500, loaded for it; its
-  band is Inter, as on every card. No italics on sans-serif type
+  (and its italic) and its line in Hanken Grotesk 500, loaded for it, and
+  Road Sign Math in its Overpass 700 and 800; their bands are Inter, as on
+  every card. No italics on sans-serif type
   (thingelstad.com AGENTS.md).
 - **Words**: only what the page publishes as its h-entry, and on Linking
   Things only Jamie's own notes. No photo of Jamie, no running totals that
@@ -246,7 +274,10 @@ maker ships first, so the page never names a card it can't draw):
    cards take (`/<id>` then the page's own path, `.png` for its trailing
    `.html` or `/`), `read(p)` for what its h-entry gives the card, a `layout`
    (one in `src/card.mjs`, or a new one), its `mark`, and `photo(src)` naming
-   the only photo host it may fetch (`() => null` for none). The site must be
+   the only photo host it may fetch (`() => null` for none). A page read
+   from another microformat (Road Sign Math's players, an h-card) names it
+   as `item` in `page()`; a front page with a layout of its own names it as
+   `homeLayout`. The site must be
    in `shared/sites.json` (`npm run sites:sync`); its origin and label come
    from there. Its card follows "Card design" above: a proposal on a canvas
    beside the site's current share image first when it needs a new layout.

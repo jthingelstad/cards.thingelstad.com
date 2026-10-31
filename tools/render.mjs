@@ -1,6 +1,6 @@
 // Draw cards on this Mac, the way the Lambda does, reading the live posts.
 //
-//   node tools/render.mjs <post URL or card path>... [--out=<dir>] [--root=<dir>] [--overlay=<json>]
+//   node tools/render.mjs <post URL or card path>... [--out=<dir>] [--root=<dir>] [--overlay=<json>] [--rsm=<band|plate>] [--origin=<url>]
 //   node tools/render.mjs --samples [--out=<dir>]   (npm run previews)
 //
 // --samples draws the pages in tools/samples.json, one for each way a card
@@ -8,6 +8,13 @@
 //
 // --overlay='{"wide":0.95,"words":150,"top":0.6}' draws the blog overlay with
 // other settings than OVERLAY in src/card.mjs, to compare them.
+//
+// --rsm=band|plate draws Road Sign Math's sign cards with that setting of its
+// math (RSM_SIGN in src/card.mjs).
+//
+// --origin=http://localhost:8787 reads the pages, photos and map from a
+// site's dev server in place of its live origin, so a card can be seen before
+// the page is live; the page is read as if it were at its live address.
 //
 // Takes any page a site in sites.mjs has a card for. Writes <site>-<slug>.png
 // (or .jpg, for a card with a photo) for each to --out (default
@@ -28,11 +35,31 @@ const args = process.argv.slice(2);
 const out = args.find((a) => a.startsWith('--out='))?.slice(6) ?? path.join(OUT, 'preview');
 const root = args.find((a) => a.startsWith('--root='))?.slice(7);
 const overlay = JSON.parse(args.find((a) => a.startsWith('--overlay='))?.slice(10) ?? '{}');
+const rsm = args.find((a) => a.startsWith('--rsm='))?.slice(6);
+if (rsm) overlay.rsm = rsm;
+const origin = args.find((a) => a.startsWith('--origin='))?.slice(9);
 const samples = args.includes('--samples') ? await readSamples() : [];
 const targets = [...samples, ...args.filter((a) => !a.startsWith('--'))];
 if (!targets.length) {
   console.error('usage: node tools/render.mjs <post URL or card path>... [--samples] [--out=<dir>] [--root=<dir>] [--overlay=<json>]');
   process.exit(2);
+}
+
+if (origin) {
+  // Every fetch for a site's live origin goes to the dev server, and its
+  // pages come back with the dev server's address turned into the live one.
+  const live = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const at = new URL(url);
+    const site = Object.values(SITES).find((s) => s.origin === at.origin);
+    if (!site) return live(url, init);
+    const response = await live(`${origin}${at.pathname}${at.search}`, init);
+    if (!(response.headers.get('content-type') ?? '').startsWith('text/html')) return response;
+    const html = (await response.text()).replaceAll(origin, site.origin);
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+    return new Response(html, { status: response.status, headers });
+  };
 }
 
 const dir = await stageAssets();
@@ -49,9 +76,10 @@ for (const target of targets) {
     console.warn(`${target}: drawn without its photo (${error.message})`);
     return null;
   });
-  const format = photo ? 'jpeg' : 'png';
+  const format = photo && !photo.svg ? 'jpeg' : 'png';
   const image = await render(cardFor(data, { site: SITES[post.site], photo, kicker: post.kicker, overlay }), dir, { format });
-  const file = path.join(out, `${post.site}-${path.basename(cardPath, '.png')}.${format === 'jpeg' ? 'jpg' : 'png'}`);
+  const name = post.site === 'rsm' ? cardPath.slice(5, -4).replace('/', '-') + (rsm && post.kind === 'sign' ? `-${rsm}` : '') : path.basename(cardPath, '.png');
+  const file = path.join(out, `${post.site}-${name}.${format === 'jpeg' ? 'jpg' : 'png'}`);
   await fs.writeFile(file, image);
   const over = post.site === 'www' && overPhoto(data, photo, { ...OVERLAY, ...overlay }) ? '  over its photo' : '';
   console.log(`${file}  ${image.length} bytes  ${Date.now() - started} ms${over}`);

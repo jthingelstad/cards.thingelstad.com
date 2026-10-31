@@ -19,6 +19,9 @@
 //              (only a site whose page() names one)
 //   photo(src) where a photo its page names is fetched from, or null for
 //              one it never draws: the only photo hosts ever fetched
+//   homeLayout the card.mjs layout of its front page (the Weekly Thing's
+//              when none is named)
+//   svg        true when the site may name an SVG (a map) as its photo
 import { parseFragment } from 'parse5';
 import shared from './shared/sites.json' with { type: 'json' };
 import { count, first, headlineLines, markup, plainText, words } from './read.mjs';
@@ -36,6 +39,27 @@ const LINK = /^links\/[0-9a-f]{12}$/;
 // A Things 4 Good page (/impact/), and a photo cut for its card.
 const T4G_PAGE = /^[a-z0-9-]+$/;
 const T4G_PHOTO = /^https:\/\/things4good\.xyz\/images\/cards\/[a-z0-9-]+\.jpe?g$/;
+// A Road Sign Math sign or player page, a photo at its large size, and its
+// map of the states (the land and the borders Home's pins sit on).
+const RSM_PAGE = /^(signs|players)\/([a-z0-9-]{1,80})$/;
+const RSM_PHOTO = /^https:\/\/roadsignmath\.xyz\/p\/[0-9A-Za-z]{26}\/large\.jpg$/;
+const RSM_MAP = 'https://roadsignmath.xyz/us-map.svg';
+const UTC_DAY = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+
+/** "October 22, 2023" for a YYYY-MM-DD day, as the site writes it (no time
+ * zone: the day the sign was found where it was found), or ''. */
+export function dayLabel(day) {
+  const match = /^(\d{4}-\d{2}-\d{2})$/.exec(day ?? '');
+  return match ? UTC_DAY.format(new Date(`${match[1]}T00:00:00Z`)) : '';
+}
+
+/** A Road Sign Math pin, "55.68 53.46 5": where it sits on the map in
+ * percent of its width and height, and how many signs it stands for. */
+export function rsmPin(value) {
+  const [x, y, n] = String(value ?? '').trim().split(/\s+/).map(Number);
+  const inside = (v) => Number.isFinite(v) && v >= 0 && v <= 100;
+  return inside(x) && inside(y) && Number.isInteger(n) && n > 0 ? { x, y, n } : null;
+}
 
 /** A dated post's page: /2026/10/15/the-nnxyz-rooms.html. */
 const dated = (rest) => (DATED.test(rest) ? { path: `/${rest}.html` } : null);
@@ -164,6 +188,68 @@ const ENTRIES = {
       };
     },
     photo: (src) => (T4G_PHOTO.test(src) ? src : null),
+  },
+  // Road Sign Math, Jamie's road trip game (2026-10-31; Jamie: "the road
+  // sign image should be edge-to-edge, the solution (math) should be MathJax
+  // rendered as an overlay on top of it"). A sign's page is an h-entry: its
+  // name, the day it was found (dt-published, a bare day), its photo
+  // (u-photo), where (p-location), who found it (p-finder), the first way
+  // as text and LaTeX (p-math, p-tex), how many ways there are (p-way-count)
+  // and the sign's numbers (p-number), shown when nobody has solved it. A
+  // player's page is an h-card: p-name, the profile photo (u-photo) or the
+  // letter avatar's colour (p-avatar-color), p-sign-count, p-state-count
+  // and p-first-year. Home is an h-feed: p-name, p-kicker, p-summary, the
+  // map (u-map, the site's own /us-map.svg) and a p-pin for each pin on it.
+  rsm: {
+    mark: '#5cc395',
+    layout: 'rsm',
+    homeLayout: 'rsmHome',
+    svg: true,
+    page(rest) {
+      if (rest === 'index') return { path: '/', home: true };
+      const match = RSM_PAGE.exec(rest);
+      if (!match) return null;
+      return match[1] === 'signs' ? { path: `/${rest}`, kind: 'sign' } : { path: `/${rest}`, kind: 'player', item: 'h-card' };
+    },
+    read(p, { kind }) {
+      const photo = first(p.photo) ?? '';
+      if (kind === 'player') {
+        const color = words(p['avatar-color']);
+        return {
+          kind,
+          photo: RSM_PHOTO.test(photo) ? photo : null,
+          color: /^#[0-9a-f]{6}$/i.test(color) ? color : '#006348',
+          counts: { signs: count(p['sign-count']), states: count(p['state-count']) },
+          since: count(p['first-year']),
+          text: '',
+        };
+      }
+      return {
+        kind: 'sign',
+        photo: RSM_PHOTO.test(photo) ? photo : null,
+        place: words(p.location),
+        day: dayLabel(first(p.published)),
+        finders: (p.finder ?? []).map((finder) => words([finder])).filter(Boolean),
+        math: words(p.math),
+        tex: words(p.tex),
+        ways: count(p['way-count']),
+        numbers: (p.number ?? []).map((n) => words([n])).filter(Boolean),
+        text: words(p.math),
+      };
+    },
+    home(p) {
+      const map = first(p.map) ?? '';
+      return {
+        kind: 'home',
+        title: words(p.name),
+        kicker: words(p.kicker),
+        text: words(p.summary),
+        photo: map === RSM_MAP ? map : null,
+        pins: (p.pin ?? []).map((pin) => rsmPin(first([pin]))).filter(Boolean),
+        counts: { signs: count(p['sign-count']), players: count(p['player-count']), states: count(p['state-count']) },
+      };
+    },
+    photo: (src) => (RSM_PHOTO.test(src) || src === RSM_MAP ? src : null),
   },
 };
 

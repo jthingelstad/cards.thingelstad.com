@@ -7,12 +7,15 @@
 //   /another/2025/10/05/how-do-you-start-a.png  https://another.thingelstad.com/2025/10/05/how-do-you-start-a.html
 //   /weekly/index.png                        https://weekly.thingelstad.com/ (the newsletter's own card)
 //   /links/links/0a1b2c3d4e5f.png            https://links.thingelstad.xyz/links/0a1b2c3d4e5f/
+//   /rsm/signs/osceola.png                   https://roadsignmath.xyz/signs/osceola
+//   /rsm/players/jamie.png                   https://roadsignmath.xyz/players/jamie (an h-card)
 //
 // The page is fetched and read as an h-entry, the microformats every post,
 // issue and episode carries: p-name (titled posts only; a micropost has
 // none), dt-published and p-category here, and the rest (its words, its
 // photo, what else its card shows) as its site's entry reads them. A front
-// page is read from its h-feed instead.
+// page is read from its h-feed instead, and a page its site names another
+// item for (a player's h-card) from that.
 //
 // The page also names its own card: its og:image, with the v the site hashed
 // from what the card shows. The handler draws only the card a page names.
@@ -38,8 +41,24 @@ export function postFor(path) {
   return { site: site.id, url: `${site.origin}${at}`, ...named };
 }
 
-/** The card's words from a page's HTML; home reads a front page's h-feed. */
-export function readPost(html, url, { home = false } = {}) {
+/** The item of type a page is about: the first whose u-url is the page's
+ * own, else the first. */
+function pageItem(items, type, url) {
+  const all = [];
+  const walk = (list) => {
+    for (const item of list) {
+      if (item.type?.includes(type)) all.push(item);
+      walk(item.children ?? []);
+    }
+  };
+  walk(items);
+  return all.find((item) => (item.properties.url ?? []).includes(url)) ?? all[0] ?? null;
+}
+
+/** The card's words from a page's HTML; home reads a front page's h-feed,
+ * item names the microformat the page is read from (an h-entry unless its
+ * site says), and kind is passed to the site's read. */
+export function readPost(html, url, { home = false, item = 'h-entry', kind } = {}) {
   const site = siteAt(url);
   if (!site) throw new Error(`${url} is on no site here`);
   const items = mf2(html, { baseUrl: url }).items;
@@ -49,8 +68,8 @@ export function readPost(html, url, { home = false } = {}) {
     if (!feed) throw new Error(`no h-feed at ${url}`);
     return { url, site: site.id, home: true, published: null, categories: [], ...site.home(feed.properties), card };
   }
-  const entry = findItem(items, 'h-entry');
-  if (!entry) throw new Error(`no h-entry at ${url}`);
+  const entry = item === 'h-entry' ? findItem(items, item) : pageItem(items, item, url);
+  if (!entry) throw new Error(`no ${item} at ${url}`);
   const p = entry.properties;
   return {
     url,
@@ -60,7 +79,7 @@ export function readPost(html, url, { home = false } = {}) {
     categories: (p.category ?? []).filter((c) => typeof c === 'string'),
     counts: null,
     episode: null,
-    ...site.read(p),
+    ...site.read(p, { kind }),
     card,
   };
 }
@@ -156,16 +175,17 @@ export async function get(url, accept, limit) {
 
 /** The post at url, read for its card; null when the site has no such post.
  * home: url is the newsletter's front page. */
-export async function fetchPost(url, { home = false } = {}) {
+export async function fetchPost(url, { home = false, item, kind } = {}) {
   const response = await get(url, 'text/html', PAGE_LIMIT);
   if (response.status === 404 || response.status === 410) return null;
   // A post that redirects off its site has no card here.
   if (response.offsite) return null;
   if (!response.body) throw new Error(`${url}: HTTP ${response.status}${response.status < 300 ? ', too large' : ''}`);
-  return readPost(response.body.toString('utf8'), url, { home });
+  return readPost(response.body.toString('utf8'), url, { home, item, kind });
 }
 
 const TYPES = new Set(['image/jpeg', 'image/png', 'image/gif']);
+const SVG = 'image/svg+xml';
 
 /** A photo as a data URI the renderer can draw, or null when there is none
  * it can draw: no photo, one its site never draws, gone, too large, or a type
@@ -175,8 +195,11 @@ const TYPES = new Set(['image/jpeg', 'image/png', 'image/gif']);
 export async function fetchPhoto(src, site) {
   const from = src ? site.photo(src) : null;
   if (!from) return null;
-  const response = await get(from, 'image/jpeg,image/png;q=0.9,image/gif;q=0.8', PHOTO_LIMIT);
+  const response = await get(from, site.svg ? `${SVG},image/jpeg;q=0.9` : 'image/jpeg,image/png;q=0.9,image/gif;q=0.8', PHOTO_LIMIT);
   if (response.status === 429 || response.status >= 500) throw new Error(`${from}: HTTP ${response.status}`);
+  // An SVG (Road Sign Math's map) is never drawn as it comes: its layout
+  // takes the shapes it needs from the markup and draws them itself.
+  if (response.body && site.svg && response.type === SVG) return { svg: response.body.toString('utf8') };
   if (!response.body || !TYPES.has(response.type)) return null;
   return {
     src: `data:${response.type};base64,${response.body.toString('base64')}`,

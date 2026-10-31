@@ -14,6 +14,11 @@
     { "url": "https://links.thingelstad.xyz/links/a247e5eef435/", "shows": "links: a saved link, no note" },
     { "url": "https://links.thingelstad.xyz/links/2ca5ff97f513/", "shows": "links: a long title on three lines" },
     { "url": "https://things4good.xyz/", "shows": "t4g: the front page over its candle photo, with an accent and the sale's facts" },
-    { "url": "https://things4good.xyz/impact/", "shows": "t4g: a page with a line under its heading" }
+    { "url": "https://things4good.xyz/impact/", "shows": "t4g: a page with a line under its heading" },
+    { "url": "https://roadsignmath.xyz/signs/osceola", "shows": "rsm: a sign's photo with its math over it" },
+    { "url": "https://roadsignmath.xyz/signs/i-35w-at-82nd-street", "shows": "rsm: a sign whose math has fractions, stepped down to fit" },
+    { "url": "https://roadsignmath.xyz/players/jamie", "shows": "rsm: a player with a profile photo" },
+    { "url": "https://roadsignmath.xyz/players/tammy", "shows": "rsm: a player with the letter avatar" },
+    { "url": "https://roadsignmath.xyz/", "shows": "rsm: Home, the map with every pin" }
   ]
 }
