@@ -191,7 +191,9 @@ test('a sign card: the place, the math, the sign and who found it, and the ways 
   assert.deepEqual(texts(tree).filter((t) => t.trim()), [
     'NEAR OSCEOLA, MISSOURI',
     'Osceola',
-    'Found by Jamie and Tyler · October 22, 2023',
+    'Found by Jamie and Tyler',
+    '·',
+    'October 22, 2023',
     '+2 more ways',
     'Jamie Thingelstad',
     'Road Sign Math',
@@ -202,6 +204,10 @@ test('a sign card: the place, the math, the sign and who found it, and the ways 
   assert.match(words, /"fontFamily":"Overpass"/);
   assert.match(words, /"color":"#5cc395"},"children":"Road Sign Math"/);
   assert.equal(RSM_SIGN, 'plate');
+  // Overpass's middle dot has no advance, so no rsm text carries one: each dot is
+  // Inter's, set apart by margin.
+  assert.ok(!texts(tree).some((t) => t.length > 1 && t.includes('\u00b7')));
+  assert.match(words, /"fontFamily":"Inter","fontWeight":600,"margin":"0 0.3em"},"children":"\u00b7"/);
   // On the plate: the site's green under the math; over the band, none.
   assert.match(JSON.stringify(cardFor(SIGN, { site: SITES.rsm, photo: null })), /"backgroundColor":"#006348"/);
   assert.ok(!JSON.stringify(cardFor(SIGN, { site: SITES.rsm, photo: null, overlay: { rsm: 'band' } })).includes('#006348'));

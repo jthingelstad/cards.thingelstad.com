@@ -864,11 +864,23 @@ const rsmFact = ([n, word]) =>
     h('div', { display: 'block' }, word),
   );
 
-/** Who found a sign and when: "Found by Jamie and Tyler · October 22, 2023". */
-function foundLine(post) {
+/** Parts in a row with a middle dot between them. Overpass draws U+00B7 with
+ * no advance, so in a " · " the dot sits on the space after it and reads
+ * "Jamie ·October". The dot here is Inter's, spaced by margin rather than by
+ * spaces, which Satori trims at the edge of a text node. A part may be a node,
+ * so one can shrink and clip while the others keep their width. */
+function dotted(parts, style) {
+  const items = parts.filter(Boolean).map((part) => (typeof part === 'string' ? h('div', { display: 'block', flexShrink: 0 }, part) : part));
+  const dot = () => h('div', { display: 'block', flexShrink: 0, fontFamily: 'Inter', fontWeight: 600, margin: '0 0.3em' }, '\u00b7');
+  return tree('div', { display: 'flex', alignItems: 'baseline', ...style }, items.flatMap((item, i) => (i ? [dot(), item] : [item])));
+}
+
+/** Who found a sign and when: "Found by Jamie and Tyler · October 22, 2023".
+ * A long list of finders is cut short; the date is not. */
+function foundLine(post, style) {
   const finders = post.finders ?? [];
   const who = finders.length < 2 ? (finders[0] ?? '') : `${finders.slice(0, -1).join(', ')} and ${finders.at(-1)}`;
-  return [who && `Found by ${who}`, post.day].filter(Boolean).join(' · ');
+  return dotted([who && h('div', { display: 'block', flexShrink: 1, minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }, `Found by ${who}`), post.day], style);
 }
 
 /** The ways past the first: "+2 more ways". */
@@ -895,7 +907,7 @@ function rsmSign(post, { site, photo, rule }) {
     : [h('div', { ...FILL, display: 'flex', backgroundImage: `radial-gradient(circle at 85% 20%, rgba(0,99,72,0.55) 0%, rgba(0,99,72,0.15) 40%, rgba(16,23,19,0) 70%)` })];
   const more = moreWays(post);
   const title = h('div', { display: 'block', ...OVERPASS, fontSize: 38, lineClamp: 1, color: WHITE }, post.title);
-  const found = h('div', { display: 'block', fontFamily: 'Overpass', fontWeight: 700, fontSize: 24, color: RSM.soft, marginTop: 4, lineClamp: 1 }, foundLine(post));
+  const found = foundLine(post, { fontFamily: 'Overpass', fontWeight: 700, fontSize: 24, color: RSM.soft, marginTop: 4 });
   const tiles = tree(
     'div',
     { display: 'flex', alignItems: 'center' },
@@ -919,7 +931,7 @@ function rsmSign(post, { site, photo, rule }) {
         variant !== 'plate' && solved && h('div', { display: 'flex', marginBottom: 14 }, bar(RSM.ink)),
         math,
         tree('div', { display: 'flex', alignItems: 'flex-end', marginTop: solved ? 22 : 18 }, [
-          tree('div', { display: 'flex', flexDirection: 'column', flexGrow: 1, flexShrink: 1 }, [title, found]),
+          tree('div', { display: 'flex', flexDirection: 'column', flexGrow: 1, flexShrink: 1, minWidth: 0 }, [title, found]),
           more && h('div', { display: 'flex', marginLeft: 20, marginBottom: 2, textShadow: 'none', flexShrink: 0 }, rsmFact(['', more])),
         ]),
       ]),
@@ -1066,7 +1078,7 @@ function rsmHome(post, { site, photo }) {
       tree('div', { display: 'flex', flexDirection: 'column', width }, [
         post.kicker && h('div', { display: 'block', fontFamily: 'Overpass', fontWeight: 700, fontSize: 20, letterSpacing: '0.14em', color: RSM.ink, marginBottom: 14 }, post.kicker.toUpperCase()),
         headline(words, { ...OVERPASS, fontSize: 60, lineHeight: 1.02, color: WHITE }, { width, lines: 4, em: 0.6 }),
-        counts.length > 0 && h('div', { display: 'block', marginTop: 22, fontFamily: 'Overpass', fontWeight: 700, fontSize: 24, color: RSM.soft }, counts.join(' · ')),
+        counts.length > 0 && dotted(counts, { marginTop: 22, fontFamily: 'Overpass', fontWeight: 700, fontSize: 24, color: RSM.soft }),
       ]),
     ]),
     site,
