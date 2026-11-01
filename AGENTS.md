@@ -145,8 +145,10 @@ for Another Thing podcast episodes… we need that one too").
   be edge-to-edge, the solution (math) should be MathJax rendered as an
   overlay on top of it"). A sign (`/rsm/signs/<slug>.png`, an h-entry) is its
   photo edge to edge, cropped from 20% down since signs stand high in the
-  frame, with the place (`p-location`) as the kicker beside the site's logo
-  (√(5 − 1) = 2 on its green plate), the first way's math drawn from its
+  frame, with the place (`p-location`) as the kicker beside the site's icon
+  (Highway, the identity's white square root taking the exit on highway
+  green, its `highway.svg` byte for byte; since 2026-11-01, before that the
+  √(5 − 1) = 2 plate), the first way's math drawn from its
   LaTeX (`p-tex`) by MathJax 3.2.2, the version the site draws it with
   (`src/math.mjs`), the sign's name, who found it and the day
   (`p-finder`, `dt-published`, a bare day written as is), and "+N more ways"
