@@ -31,7 +31,7 @@
 // and counts are pills. Things 4 Good, the family's candle fundraiser, joined
 // the same day in its own site's type (t4gCard).
 
-import { mathImage, mathSvg } from './math.mjs';
+import { mathImage } from './math.mjs';
 
 export const WIDTH = 1200;
 export const HEIGHT = 630;
@@ -793,17 +793,11 @@ const RSM = {
 };
 const OVERPASS = { fontFamily: 'Overpass', fontWeight: 800, lineHeight: 1.08, letterSpacing: '-0.01em' };
 
-// The site's logo, √(5 − 1) = 2 on a sign plate, as its layout.tsx draws it.
-const RSM_LOGO = (() => {
-  const math = mathSvg('\\sqrt{5 - 1} = 2');
-  const inner = math.markup.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '').replaceAll('currentColor', '#ffffff');
-  return svg(
-    '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 64 64">' +
-      '<rect width="64" height="64" rx="12" fill="#006348"/>' +
-      '<rect x="5.5" y="5.5" width="53" height="53" rx="8.5" fill="none" stroke="#fff" stroke-width="3"/>' +
-      `<svg x="11" y="22" width="42" height="20" viewBox="${math.box}">${inner}</svg></svg>`,
-  );
-})();
+// The site's icon, Highway: the Road Sign Math identity's primary icon, a white
+// square root that takes the exit on highway green, as the identity package
+// draws it (roadsignmath.xyz design/brand/v1/icons/svg/highway.svg, byte for
+// byte; the site's favicon). Square and full bleed: each use rounds it.
+const RSM_LOGO = svg('<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title"><title id="title">Road Sign Math — Highway</title><rect x="0" y="0" width="1024" height="1024" rx="0" fill="#006348"/><path id="radical-route" fill="#FFFFFF" d="M 110 555 H 213 Q 220 555 223 562 L 282 706 L 420 384 Q 424 375 434 375 H 696 L 754 317 L 676 239 Q 668 231 680 231 H 910 Q 918 231 918 239 V 455 Q 918 467 910 459 L 835 384 L 752 467 Q 744 475 734 475 H 485 L 336 836 Q 332 846 321 846 H 240 Q 232 846 228 836 L 101 568 Q 95 555 110 555 Z"/></svg>');
 
 /** How a sign card's math is set, for Jamie to choose (npm run render --
  * --rsm=band|plate): 'plate', on the site's green sign plate floating over
