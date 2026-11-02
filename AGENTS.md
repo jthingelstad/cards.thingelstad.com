@@ -412,5 +412,8 @@ group, kept 24 months (731 days; Jamie, 2026-10-28), through the
 `cards-web-access` delivery, the same shape as Linking Things: the request's path, status, bytes, timing, cache result,
 edge, protocol and user agent, never the client IP or the query string.
 
+The distribution uses the shared `edge` web ACL (projects-sysadmin `edge-waf`
+stack; rules count only until tuned).
+
 Keep the ACM validation CNAME
 (`_599951081a9a6beba0c85c6a673beb51.cards`) at Namecheap: renewal needs it.

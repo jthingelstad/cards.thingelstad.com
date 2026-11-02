@@ -323,6 +323,9 @@
           "HttpVersion": "http2and3",
           "IPV6Enabled": true,
           "PriceClass": "PriceClass_100",
+          "WebACLId": {
+            "Fn::ImportValue": "edge-waf-WebAclArn"
+          },
           "Aliases": {
             "Fn::If": [
               "HasCertificate",
