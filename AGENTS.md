@@ -391,18 +391,16 @@ The function's reserved concurrency (10) is the cost ceiling. A made-up `v`
 costs a page fetch and a 302, never a drawing; every drawn card is one a page
 names.
 
-Alarms (draw failures, function errors, and throttles: a request turned away
-at the ceiling never reaches the function, so only the throttle alarm sees it)
-go to `weekly-thing-librarian-alarms`, the queue-only topic the other sites use.
-The throttle alarm wants 50 or more turned away in each of three quarter
-hours running (2026-10-27; Jamie: "I don't think a single request turned
-away shoudl be an alarm"). Crawlers reach the ceiling as a matter of course
-(AhrefsBot sweeping the blog's photo cards held it at 10 for three and a
-half hours on 2026-10-27, about $0.45 of drawing over two days), and a
-turned-away request is not cached, so the crawler gets the card on its next
-try.
-None of them sees past Lambda, so DNS, the certificate and CloudFront are
-watched from outside: Jamie's updown.io check (2026-10-24; not
+The stack has no CloudWatch alarms since 2026-11-03: Jamie cut the account to
+a handful, none here ("Approved: cut CloudWatch alarms to the ~8 listed ...
+and delete the rest"). The draw-failures, errors and throttles alarms went to a
+daily digest line nobody acted on. The `Cards/DrawFailures` metric filter and
+the function's standard Lambda metrics stay. Crawlers reach the concurrency
+ceiling as a matter of course (AhrefsBot sweeping the blog's photo cards held
+it at 10 for three and a half hours on 2026-10-27, about $0.45 of drawing over
+two days), and a turned-away request is not cached, so the crawler gets the
+card on its next try.
+DNS, the certificate and CloudFront are watched from outside: Jamie's updown.io check (2026-10-24; not
 Tinylytics, which has no page views here to count). `/health` is the path to
 check, never `/`, which is a 404 by design.
 
