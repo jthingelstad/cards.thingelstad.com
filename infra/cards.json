@@ -219,7 +219,7 @@
           "arm64"
         ],
         "Handler": "index.handler",
-        "MemorySize": 1024,
+        "MemorySize": 1769,
         "Timeout": 20,
         "ReservedConcurrentExecutions": 10,
         "Role": {
